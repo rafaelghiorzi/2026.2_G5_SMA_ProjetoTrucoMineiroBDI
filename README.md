@@ -10,17 +10,18 @@ As seções do Template NÃO DEVEM SER OMITIDAS, sendo TODAS RELEVANTES.
  
  (Apague esses comentários)
 
-# NomeDoProjeto
+# Simulação de Truco Mineiro com Agentes BDI
 
 **Disciplina**: CIC0190 - INTRODUÇÃO A SISTEMAS MULTIAGENTE - T01 <br>
-**Nro do Grupo (de acordo com a Planilha de Divisão dos Grupos)**: XX<br>
-**Frente de Pesquisa**: XXXXXXXXXX<br>
+**Nro do Grupo**: 05<br>
+**Frente de Pesquisa**: Agentes BDI no Contexto de Truco Mineiro<br>
 
 ## Alunos
 |Matrícula | Aluno |
 | -- | -- |
-| xx/xxxxxx  |  xxxx xxxx xxxxx |
-| xx/xxxxxx  |  xxxx xxxx xxxxx |
+| 23/1035393 | Lucas Saad Rodrigues    |
+| 23/1018900 | Lucca Schoen de Almeida |
+| 23/2006144 | Rafael Dias Ghiorzi     |
 
 ## Sobre 
 Descreva o seu projeto em linhas gerais. 
