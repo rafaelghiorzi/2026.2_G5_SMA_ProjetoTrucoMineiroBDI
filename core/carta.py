@@ -1,43 +1,64 @@
-NAIPES = ["ouros", "espadas", "copas", "paus"]
-
-# Ordem normal, da mais fraca para a mais forte (o índice casa com a lógica de força da carta)
-ORDEM_NORMAL = ["4", "5", "6", "7", "Q", "J", "K", "A", "2", "3"]
-
-# Manilhas fixas, da mais forte para a mais fraca
-MANILHAS_FIXAS_ORDEM = [
-    ("4", "paus"),     # Zap — mais forte do jogo
-    ("7", "copas"),
-    ("A", "espadas"),  # Espadilha
-    ("7", "ouros"),    # mais fraca das manilhas
-]
 
 from dataclasses import dataclass
 
+NAIPES = ["ouros", "espadas", "copas", "paus"]
+VALORES_NORMAIS = ["Q", "J", "K", "A", "2", "3"]
+CURINGA = "curinga"
+
+GAMMA = 1.5  
+
+POSICOES: dict[tuple[str, str | None], int] = {}
+for naipe in NAIPES:
+    POSICOES[("Q", naipe)] = 1
+    POSICOES[("J", naipe)] = 2
+    POSICOES[("K", naipe)] = 3
+    POSICOES[("2", naipe)] = 5
+    POSICOES[("3", naipe)] = 6
+POSICOES[("A", "ouros")] = 4
+POSICOES[("A", "copas")] = 4
+POSICOES[("A", "paus")] = 4
+POSICOES[("A", "espadas")] = 9          
+POSICOES[(CURINGA, None)] = 7            
+POSICOES[("7", "ouros")] = 8
+POSICOES[("7", "copas")] = 10
+POSICOES[("4", "paus")] = 11           
+
+RHO_MAXIMO = 11
+
+
 @dataclass(frozen=True)
 class Carta:
-    valor: str
-    naipe: str
+    valor: str                 
+    naipe: str | None = None   
 
-def __post_init__(self):
-    if self.valor not in ORDEM_NORMAL:
-        raise ValueError(f"Valor inválido: {self.valor}")
-    if self.naipe not in NAIPES:
-        raise ValueError(f"Naipe inválido: {self.naipe}")
+    def __post_init__(self):
+        if (self.valor, self.naipe) not in POSICOES:
+            raise ValueError(f"Carta inexistente neste baralho: {self.valor} de {self.naipe}")
 
-@property
-def eh_manilha(self) -> bool:
-    return (self.valor, self.naipe) in MANILHAS_FIXAS_ORDEM
+    @property
+    def eh_curinga(self) -> bool:
+        return self.valor == CURINGA
 
-def forca(self) -> int:
-    if self.eh_manilha:
-        posicao = MANILHAS_FIXAS_ORDEM.index((self.valor, self.naipe))
-        return 15 - posicao
-    return ORDEM_NORMAL.index(self.valor)
+    @property
+    def eh_manilha(self) -> bool:
+        return self.rho() >= 8
+
+    def rho(self) -> int:
+        return POSICOES[(self.valor, self.naipe)]
+
+    def poder(self) -> float:
+        return (self.rho() / RHO_MAXIMO) ** GAMMA
+
+    def __repr__(self) -> str:
+        nome = "Curinga" if self.eh_curinga else f"{self.valor} de {self.naipe}"
+        tag = " [MANILHA]" if self.eh_manilha else ""
+        return f"{nome}{tag}"
+
 
 def comparar_cartas(c1: Carta, c2: Carta) -> int:
-    f1, f2 = c1.forca(), c2.forca()
-    if f1 > f2:
+    r1, r2 = c1.rho(), c2.rho()
+    if r1 > r2:
         return 1
-    if f1 < f2:
+    if r1 < r2:
         return -1
     return 0
