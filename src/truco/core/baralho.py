@@ -1,5 +1,5 @@
 import random
-from core.carta import Carta, NAIPES, VALORES_NORMAIS, CURINGA
+from truco.core.carta import Carta, NAIPES, VALORES_NORMAIS, CURINGA
 
 
 def novo_baralho() -> list[Carta]:
