@@ -1,13 +1,16 @@
 [project]
 name = "truco"
 version = "0.1.0"
-description = "Add your description here"
+description = "Sistema Multiagentes de Truco Mineiro com agentes BDI e FIPA-ACL"
 readme = "README.md"
 authors = [
-    { name = "rafaelghiorzi", email = "rafael.ghiorzi@gmail.com" }
+    { name = "rafaelghiorzi", email = "rafael.ghiorzi@gmail.com" },
+    { name = "Lucas Saad Rodrigues", email = ""},
+    { name = "Lucca Schoen de Almeida", email = ""}
 ]
 requires-python = ">=3.14"
 dependencies = [
+    "greenlet>=3.5.6",
     "spade>=4.1.4",
 ]
 
