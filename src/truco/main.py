@@ -1,5 +1,6 @@
 """Ponto de entrada. Por enquanto só roda um agente one-shot de teste."""
 
+import asyncio
 import spade
 from spade.agent import Agent
 from spade.behaviour import OneShotBehaviour
@@ -7,26 +8,55 @@ from spade.behaviour import OneShotBehaviour
 from truco.config import AGENT_PASSWORD, XMPP_DOMAIN
 
 
-class HelloAgent(Agent):
-    class SayHello(OneShotBehaviour):
-        async def run(self) -> None:
-            print(f"[{self.agent.jid}] Olá! Ambiente SPADE funcionando.")
-            await self.agent.stop()
+class MeuComportamento(OneShotBehaviour):
+    agent: Agent
 
+
+    async def on_start(self) -> None:
+        print("Iniciando comportamento one-shot de teste.")
+
+    async def run(self) -> None:
+        print("Comportamento one-shot de teste rodando.")
+        await asyncio.sleep(1)
+        print("Comportamento one-shot de teste finalizado.")
+
+    async def on_end(self) -> None:
+        print("Comportamento one-shot de teste encerrado.")
+        await self.agent.stop()
+
+
+
+class MeuAgente(Agent):
     async def setup(self) -> None:
-        self.add_behaviour(self.SayHello())
+        print(f"[{self.jid}] Configurando agente.")
+
+        self.comportamento = MeuComportamento()
+        self.add_behaviour(self.comportamento)
 
 
-async def main() -> None:
-    agent = HelloAgent(f"hello@{XMPP_DOMAIN}", AGENT_PASSWORD)
-    await agent.start()
-    await spade.wait_until_finished(agent)
+async def main():
+    id = f"meu_agente@{XMPP_DOMAIN}"
+
+    agente = MeuAgente(id, AGENT_PASSWORD)
+
+    await agente.start()
+    print(f"[{id}] Agente iniciado.")
+
+    while agente.is_alive():
+        try:
+            await asyncio.sleep(1)
+        except KeyboardInterrupt:
+            print("Interrompido pelo usuário.")
+            break
+
+    assert agente.comportamento.exit_code == 10
+    await agente.stop()
+
+    print(f"[{id}] Agente encerrado.")
 
 
 def run() -> None:
     spade.run(main(), embedded_xmpp_server=True)
 
-
-# Obrigatório: o servidor XMPP embutido reimporta __main__ em outro processo.
 if __name__ == "__main__":
     run()
