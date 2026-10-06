@@ -1,4 +1,6 @@
-"""Construção e leitura de mensagens FIPA-ACL."""
+"""Mensagens FIPA-ACL do jogo (Especificação, Seção 6)."""
+
+ONTOLOGIA = "truco-mineiro"
 
 
 def criar_mensagem(remetente, destinatario, performativa, conteudo):
