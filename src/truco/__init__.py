@@ -1,2 +1,1 @@
-def main() -> None:
-    print("Welcome to the Truco Mineiro BDI project!")
+"""Sistema Multiagentes de Truco Mineiro com agentes BDI e FIPA-ACL."""
