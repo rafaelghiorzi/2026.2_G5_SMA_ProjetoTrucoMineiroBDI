@@ -1,14 +1,10 @@
-"""Ponto de entrada SPADE do Truco Mineiro.
-
-Por enquanto só sobe o servidor XMPP embutido e roda um agente one-shot
-para validar o ambiente.
-"""
+"""Ponto de entrada. Por enquanto só roda um agente one-shot de teste."""
 
 import spade
 from spade.agent import Agent
 from spade.behaviour import OneShotBehaviour
 
-from truco.config import AGENT_PASSWORD, jid
+from truco.config import AGENT_PASSWORD, XMPP_DOMAIN
 
 
 class HelloAgent(Agent):
@@ -22,7 +18,7 @@ class HelloAgent(Agent):
 
 
 async def main() -> None:
-    agent = HelloAgent(jid("hello"), AGENT_PASSWORD)
+    agent = HelloAgent(f"hello@{XMPP_DOMAIN}", AGENT_PASSWORD)
     await agent.start()
     await spade.wait_until_finished(agent)
 
@@ -31,5 +27,6 @@ def run() -> None:
     spade.run(main(), embedded_xmpp_server=True)
 
 
+# Obrigatório: o servidor XMPP embutido reimporta __main__ em outro processo.
 if __name__ == "__main__":
     run()
