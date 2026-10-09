@@ -8,8 +8,8 @@ precisa, sobrescreve um dos três ganchos das regras especiais.
 from dataclasses import dataclass
 
 from truco.agents.jogador import Jogador
-from truco.comunicacao import AcaoConversa, Categoria, Evento, Resposta
-from truco.jogo import Carta
+from truco.comunicacao import AcaoConversa, Evento, Resposta
+from truco.jogo import Carta, Categoria, Mao
 
 
 @dataclass(frozen=True)
@@ -32,7 +32,7 @@ class Crencas:
     """Só fatos e anúncios brutos. A interpretação (viés, confiança) fica no agente,
     porque depende da personalidade."""
 
-    def novo_ponto(self, cartas: list[Carta]) -> None:
+    def novo_ponto(self, mao: Mao) -> None:
         """Zera tudo que é do ponto. O histórico de fuga sobrevive."""
         raise NotImplementedError
 
@@ -72,6 +72,7 @@ class JogadorBDI(Jogador):
     # --- Receita comum (Como os Agentes Decidem 3.2–3.5, resumo no Apêndice A) ---
 
     def forca_mao(self) -> float:
+        """self.mao.forca; com a mão vazia, o poder da carta que jogou nesta rodada."""
         raise NotImplementedError
 
     def crenca_sobre(self, jogador: str) -> float:

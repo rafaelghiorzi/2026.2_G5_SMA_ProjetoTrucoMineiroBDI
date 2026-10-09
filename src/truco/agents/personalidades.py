@@ -4,8 +4,8 @@ Cada uma só define os botões e, se tiver regra especial, sobrescreve um gancho
 """
 
 from truco.bdi import JogadorBDI, Personalidade
-from truco.comunicacao import AcaoConversa, Categoria
-from truco.jogo import Carta
+from truco.comunicacao import AcaoConversa
+from truco.jogo import Carta, Categoria
 
 
 class RationalShark(JogadorBDI):

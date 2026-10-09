@@ -9,8 +9,8 @@ e Maluco com regras fixas.
 from spade.agent import Agent
 from spade.behaviour import CyclicBehaviour
 
-from truco.comunicacao import AcaoConversa, Categoria, Evento, Resposta
-from truco.jogo import Carta
+from truco.comunicacao import AcaoConversa, Evento, Resposta
+from truco.jogo import Carta, Categoria, Mao
 
 
 class OuvirMesa(CyclicBehaviour):
@@ -53,7 +53,7 @@ class Jogador(Agent):
         self.mesa = mesa
         self.parceiro = parceiro
         self.adversarios = adversarios
-        self.mao: list[Carta] = []
+        self.mao = Mao()
 
     async def setup(self) -> None:
         # TODO: add_behaviour(OuvirMesa(), template) filtrando pela ONTOLOGIA.

@@ -16,15 +16,15 @@ class Medroso(Jogador):
         return Resposta.CORRER
 
     def escolher_carta(self) -> Carta:
-        raise NotImplementedError  # a mais fraca
+        raise NotImplementedError  # self.mao.mais_fraca()
 
 
 class Maluco(Jogador):
     def deve_pedir(self) -> bool:
-        raise NotImplementedError  # tem manilha e as regras permitem
+        raise NotImplementedError  # self.mao.tem_manilha e as regras permitem
 
     def responder_pedido(self, valor_pedido: int) -> Resposta:
         raise NotImplementedError  # 50% aceitar / 50% aumentar; em 12, aceita
 
     def escolher_carta(self) -> Carta:
-        raise NotImplementedError  # a mais forte
+        raise NotImplementedError  # self.mao.mais_forte()

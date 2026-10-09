@@ -1,10 +1,18 @@
 import random
-from typing import Literal
+from collections.abc import Iterator
 from dataclasses import dataclass, field
+from enum import StrEnum
+from statistics import mean
+from typing import Literal
 
 CARTAS = Literal["Q", "J", "K", "A", "2", "3", "CR", "7O", "AE", "7C", "4P"]
 TIME = Literal["A", "B"]
 NIVEIS_APOSTA = [1, 3, 6, 9, 12]
+POSICAO_MANILHA = 8  # 7O, AE, 7C e 4P
+
+# Faixas de força da mão
+LIMITE_FRACA = 0.35
+LIMITE_FORTE = 0.60
 
 POSICOES: dict[str, int] = {
     "Q" : 1,
@@ -51,6 +59,70 @@ class Carta:
     def poder(self) -> float:
         return (self.posicao / 11) ** 1.5
 
+    @property
+    def manilha(self) -> bool:
+        return self.posicao >= POSICAO_MANILHA
+
+
+class Categoria(StrEnum):
+    """Categoria da mão, usada em sinais e declarações (Como os Agentes Decidem 3.2)."""
+
+    FRACA = "fraca"
+    MEDIA = "media"
+    FORTE = "forte"
+
+def categoria_de(forca: float) -> Categoria:
+    """Separada da Mao porque o BDI também classifica a força de quem já jogou tudo."""
+    if forca < LIMITE_FRACA:
+        return Categoria.FRACA
+    if forca < LIMITE_FORTE:
+        return Categoria.MEDIA
+    return Categoria.FORTE
+
+@dataclass
+class Mao:
+    """As cartas que um jogador ainda tem."""
+
+    cartas: list[Carta] = field(default_factory=list)
+
+    def __len__(self) -> int:
+        return len(self.cartas)
+
+    def __iter__(self) -> Iterator[Carta]:
+        return iter(self.cartas)
+
+    def __contains__(self, carta: Carta) -> bool:
+        return carta in self.cartas
+
+    def remover(self, carta: Carta) -> None:
+        """Tira uma cópia da carta. Erro se ela não estiver na mão."""
+        self.cartas.remove(carta)
+
+    @property
+    def forca(self) -> float:
+        """Média do poder das cartas. Erro se a mão estiver vazia."""
+        return mean(carta.poder for carta in self.cartas)
+
+    @property
+    def categoria(self) -> Categoria:
+        return categoria_de(self.forca)
+
+    @property
+    def tem_manilha(self) -> bool:
+        return any(carta.manilha for carta in self.cartas)
+
+    def mais_forte(self) -> Carta:
+        return max(self.cartas, key=lambda carta: carta.posicao)
+
+    def mais_fraca(self) -> Carta:
+        return min(self.cartas, key=lambda carta: carta.posicao)
+
+    def mais_fraca_que_vence(self, alvo: Carta) -> Carta | None:
+        """A carta mais fraca que ganha de `alvo`, ou None se nenhuma ganha."""
+        vencedoras = [carta for carta in self.cartas if carta.posicao > alvo.posicao]
+        return min(vencedoras, key=lambda carta: carta.posicao, default=None)
+
+
 @dataclass
 class Baralho:
     cartas: list[Carta] = field(init=False)
@@ -71,14 +143,14 @@ class Baralho:
         """Embaralha o baralho"""
         self.rng.shuffle(self.cartas)
 
-    def distribuir(self, jogadores: list[str]) -> dict[str, list[Carta]]:
+    def distribuir(self, jogadores: list[str]) -> dict[str, Mao]:
         """
         Recebe a lista de JIDs dos agentes jogadores
         Devolve um dicionário jogador -> lista
         """
         maos = {}
         for jogador in jogadores:
-            maos[jogador] = [self.cartas.pop() for _ in range(3)]
+            maos[jogador] = Mao([self.cartas.pop() for _ in range(3)])
         return maos
 
 
