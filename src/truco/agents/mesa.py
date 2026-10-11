@@ -1,21 +1,27 @@
+"""Mesa: árbitro e ambiente (Especificação, Seção 3). Reativa, máquina de estados.
+
+As regras moram em truco.jogo; a mesa só guarda o quadro, conversa com os
+jogadores e chama as regras na hora certa.
+"""
+
 import random
-from typing import cast
+
 from spade.agent import Agent
-from spade.message import Message
 from spade.behaviour import FSMBehaviour, State
+from spade.message import Message
 
-from truco.config import CARTAS, TIME
+from truco.comunicacao import criar_mensagem, ler_mensagem, template_do_jogo
+from truco.config import (
+    PONTOS_PARA_VENCER,
+    TEMPO_DE_JOGADA,
+    TIME,
+    TIMES,
+    Evento,
+    FaseDaMesa,
+    Performativa,
+    Valor,
+)
 from truco.jogo import Aposta, Baralho, Carta, CartasNaMesa, Mao, Ponto
-from truco.comunicacao import Evento, criar_mensagem, ler_mensagem, template_do_jogo
-
-VEZ = "VEZ"
-FIM_PONTO = "FIM_PONTO"
-FIM_RODADA = "FIM_RODADA"
-FIM_PARTIDA = "FIM_PARTIDA"
-INICIO_PONTO = "INICIO_PONTO"
-
-TEMPO_DE_JOGADA = 15
-PONTOS_PARA_VENCER = 12
 
 
 class EstadoMesa(State):
@@ -25,7 +31,7 @@ class EstadoMesa(State):
     async def avisar_todos(self, conteudo: dict) -> None:
         """Manda o mesmo aviso aos 4 jogadores."""
         for jogador in self.agent.jogadores:
-            await self.send(criar_mensagem(jogador, "inform", conteudo))
+            await self.send(criar_mensagem(jogador, Performativa.INFORM, conteudo))
 
 
 class InicioPonto(EstadoMesa):
@@ -53,11 +59,11 @@ class InicioPonto(EstadoMesa):
                 "abridor": mesa.abridor,
                 "placar": mesa.placar,
             }
-            await self.send(criar_mensagem(jogador, "inform", conteudo))
+            await self.send(criar_mensagem(jogador, Performativa.INFORM, conteudo))
 
         # 4. Quem abre a 1ª rodada deste ponto. A partir daqui, o estado Vez assume.
         mesa.vez = mesa.abridor
-        self.set_next_state(VEZ)
+        self.set_next_state(FaseDaMesa.VEZ)
 
 
 class Vez(EstadoMesa):
@@ -72,20 +78,20 @@ class Vez(EstadoMesa):
         mesa = self.agent
 
         # 1. Pedir a jogada a quem está com a vez.
-        await self.send(criar_mensagem(mesa.vez, "request", {"evento": Evento.SUA_VEZ}))
+        await self.send(criar_mensagem(mesa.vez, Performativa.REQUEST, {"evento": Evento.SUA_VEZ}))
 
         # 2. Esperar a resposta. Sem resposta a tempo, pede de novo.
         msg = await self.receive(timeout=TEMPO_DE_JOGADA)
         if msg is None:
             print(f"[mesa] {mesa.vez} não jogou a tempo, pedindo de novo")
-            self.set_next_state(VEZ)
+            self.set_next_state(FaseDaMesa.VEZ)
             return
 
         # 3. Validar. Jogada inválida é ignorada e a vez continua com o mesmo jogador.
         carta = self.carta_valida(msg)
         if carta is None:
             print(f"[mesa] jogada inválida de {msg.sender.bare}: {msg.body}")
-            self.set_next_state(VEZ)
+            self.set_next_state(FaseDaMesa.VEZ)
             return
 
         # 4. Aplicar no quadro e avisar os 4 (inclusive quem jogou: é a confirmação).
@@ -99,10 +105,10 @@ class Vez(EstadoMesa):
 
         # 5. Rodada completa vai para FIM_RODADA; senão, a vez passa adiante.
         if len(mesa.cartas_na_mesa) == len(mesa.jogadores):
-            self.set_next_state(FIM_RODADA)
+            self.set_next_state(FaseDaMesa.FIM_RODADA)
         else:
             mesa.vez = mesa.proximo(mesa.vez)
-            self.set_next_state(VEZ)
+            self.set_next_state(FaseDaMesa.VEZ)
 
     def carta_valida(self, msg: Message) -> Carta | None:
         """A carta jogada, se a jogada for válida (Especificação 3, item 2). Senão, None."""
@@ -112,10 +118,10 @@ class Vez(EstadoMesa):
             return None
         if str(msg.sender.bare) != mesa.vez:  # bare: sem o sufixo de conexão (/recurso)
             return None
-        valor = dados.get("carta")
-        if not isinstance(valor, str):
+        try:
+            carta = Carta(Valor(dados.get("carta")))
+        except ValueError:  # não é um valor de carta que existe
             return None
-        carta = Carta(cast(CARTAS, valor))
         if carta not in mesa.maos[mesa.vez]:
             return None
         return carta
@@ -136,11 +142,11 @@ class FimRodada(EstadoMesa):
 
         # 3. Encerrar o ponto
         if mesa.ponto.encerrada:
-            self.set_next_state(FIM_PONTO)
+            self.set_next_state(FaseDaMesa.FIM_PONTO)
         else:
             mesa.vez = mesa.ponto.quem_comeca(mesa.cartas_na_mesa)
             mesa.cartas_na_mesa = []
-            self.set_next_state(VEZ)
+            self.set_next_state(FaseDaMesa.VEZ)
 
 
 class FimPonto(EstadoMesa):
@@ -159,11 +165,11 @@ class FimPonto(EstadoMesa):
 
         for pontos in mesa.placar.values():
             if pontos >= PONTOS_PARA_VENCER:
-                self.set_next_state(FIM_PARTIDA)
+                self.set_next_state(FaseDaMesa.FIM_PARTIDA)
                 break
         else:
             mesa.abridor = mesa.proximo(mesa.abridor)
-            self.set_next_state(INICIO_PONTO)
+            self.set_next_state(FaseDaMesa.INICIO_PONTO)
 
 
 class FimPartida(EstadoMesa):
@@ -187,7 +193,7 @@ class MesaAgent(Agent):
         # Quadro de informações: tudo que a mesa sabe fica aqui, e os estados leem/escrevem
         self.jogadores = jogadores  # ordem dos assentos: A, B, A, B
         self.rng = random.Random(semente)
-        self.placar: dict[TIME, int] = {"A": 0, "B": 0}
+        self.placar: dict[TIME, int] = {time: 0 for time in TIMES}
         self.abridor = jogadores[0]  # J1 abre o primeiro ponto
         self.vez = self.abridor
         self.maos: dict[str, Mao] = {}
@@ -202,18 +208,18 @@ class MesaAgent(Agent):
 
     async def setup(self) -> None:
         fluxo = FSMBehaviour()
-        fluxo.add_state(INICIO_PONTO, InicioPonto(), initial=True)
-        fluxo.add_state(VEZ, Vez())
-        fluxo.add_state(FIM_RODADA, FimRodada())
-        fluxo.add_state(FIM_PONTO, FimPonto())
-        fluxo.add_state(FIM_PARTIDA, FimPartida())
+        fluxo.add_state(FaseDaMesa.INICIO_PONTO, InicioPonto(), initial=True)
+        fluxo.add_state(FaseDaMesa.VEZ, Vez())
+        fluxo.add_state(FaseDaMesa.FIM_RODADA, FimRodada())
+        fluxo.add_state(FaseDaMesa.FIM_PONTO, FimPonto())
+        fluxo.add_state(FaseDaMesa.FIM_PARTIDA, FimPartida())
 
-        fluxo.add_transition(INICIO_PONTO, VEZ)
-        fluxo.add_transition(VEZ, VEZ)
-        fluxo.add_transition(VEZ, FIM_RODADA)
-        fluxo.add_transition(FIM_RODADA, VEZ)
-        fluxo.add_transition(FIM_RODADA, FIM_PONTO)
-        fluxo.add_transition(FIM_PONTO, INICIO_PONTO)
-        fluxo.add_transition(FIM_PONTO, FIM_PARTIDA)
+        fluxo.add_transition(FaseDaMesa.INICIO_PONTO, FaseDaMesa.VEZ)
+        fluxo.add_transition(FaseDaMesa.VEZ, FaseDaMesa.VEZ)
+        fluxo.add_transition(FaseDaMesa.VEZ, FaseDaMesa.FIM_RODADA)
+        fluxo.add_transition(FaseDaMesa.FIM_RODADA, FaseDaMesa.VEZ)
+        fluxo.add_transition(FaseDaMesa.FIM_RODADA, FaseDaMesa.FIM_PONTO)
+        fluxo.add_transition(FaseDaMesa.FIM_PONTO, FaseDaMesa.INICIO_PONTO)
+        fluxo.add_transition(FaseDaMesa.FIM_PONTO, FaseDaMesa.FIM_PARTIDA)
 
         self.add_behaviour(fluxo, template_do_jogo())

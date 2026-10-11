@@ -1,39 +1,47 @@
+"""Regras do jogo, sem SPADE (Especificação, Seção 2). Os números vêm de truco.config."""
+
 import random
-from enum import StrEnum
-from statistics import mean
 from collections.abc import Iterator
 from dataclasses import dataclass, field
+from statistics import mean
 
-from truco.config import CARTAS, TIME, NIVEIS_APOSTA, POSICAO_MANILHA, LIMITE_FRACA, LIMITE_FORTE, POSICOES, QUANTIDADES
+from truco.config import (
+    CARTAS,
+    CARTAS_POR_MAO,
+    EXPOENTE_PODER,
+    LIMITE_FORTE,
+    LIMITE_FRACA,
+    NIVEIS_APOSTA,
+    POSICAO_MANILHA,
+    POSICAO_MAXIMA,
+    RODADA_MINIMA_PARA_PEDIR,
+    TIME,
+    TIMES,
+    Categoria,
+    Valor,
+)
 
 
 def time_de(jogadores: list[str], jogador: str) -> TIME:
 
     """Assentos alternam os times: 1º e 3º são o A, 2º e 4º são o B."""
-    return "A" if jogadores.index(jogador) % 2 == 0 else "B"
+    return TIMES[jogadores.index(jogador) % 2]
 
 @dataclass(frozen=True)
 class Carta:
-    valor: CARTAS
+    valor: Valor
 
     @property
     def posicao(self) -> int:
-        return POSICOES[self.valor]
+        return CARTAS[self.valor].posicao
 
     @property
     def poder(self) -> float:
-        return (self.posicao / 11) ** 1.5
+        return (self.posicao / POSICAO_MAXIMA) ** EXPOENTE_PODER
 
     @property
     def manilha(self) -> bool:
         return self.posicao >= POSICAO_MANILHA
-
-class Categoria(StrEnum):
-    """Categoria da mão, usada em sinais e declarações (Como os Agentes Decidem 3.2)."""
-
-    FRACA = "fraca"
-    MEDIA = "media"
-    FORTE = "forte"
 
 def categoria_de(forca: float) -> Categoria:
     """Separada da Mao porque o BDI também classifica a força de quem já jogou tudo."""
@@ -97,8 +105,8 @@ class Baralho:
     def gerar_baralho(self) -> list[Carta]:
         """Cria a quantidade certa de cada carta"""
         baralho = []
-        for valor, quantidade in QUANTIDADES.items():
-            baralho.extend([Carta(valor)] * quantidade)
+        for valor, info in CARTAS.items():
+            baralho.extend([Carta(valor)] * info.copias)
 
         return baralho
 
@@ -113,7 +121,7 @@ class Baralho:
         """
         maos = {}
         for jogador in jogadores:
-            maos[jogador] = Mao([self.cartas.pop() for _ in range(3)])
+            maos[jogador] = Mao([self.cartas.pop() for _ in range(CARTAS_POR_MAO)])
         return maos
 
 # Uma rodada na mesa: (jogador, carta) na ordem em que foram jogadas
@@ -174,7 +182,7 @@ class Ponto:
         
         resultados = self.resultados
         
-        for time in ("A", "B"):
+        for time in TIMES:
             if resultados.count(time) >= 2:
                 return True, time
         
@@ -229,7 +237,7 @@ class Aposta:
         A mesa ainda confere se é a vez dele (regra 2) ou se é ele quem responde.
         """
         return (
-            rodada >= 2
+            rodada >= RODADA_MINIMA_PARA_PEDIR
             and self._proximo_nivel() is not None
             and time_de(self.jogadores, jogador) != self.ultimo_time
         )

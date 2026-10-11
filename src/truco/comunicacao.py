@@ -1,45 +1,17 @@
-"""Mensagens FIPA-ACL do jogo (Especificação, Seção 6)."""
+"""Mensagens FIPA-ACL do jogo (Especificação, Seção 6).
+
+O vocabulário (eventos, performativas, ontologia) fica em truco.config.
+"""
 
 import json
-from enum import StrEnum
 
 from spade.message import Message
 from spade.template import Template
 
-ONTOLOGIA = "truco-mineiro"
+from truco.config import ONTOLOGIA, Evento, Performativa
 
 
-class Evento(StrEnum):
-    """O que a mesa avisa aos jogadores. Os que pedem resposta estão marcados."""
-
-    NOVO_PONTO = "novo-ponto"
-    SUA_VEZ = "sua-vez"  # pede: pedir? + carta
-    CARTA_JOGADA = "carta-jogada"
-    PEDIDO = "pedido"  # pede resposta, se for para mim
-    PEDE_DECLARACAO = "pede-declaracao"  # pede: categoria da mão
-    DECLARACAO = "declaracao"
-    RESPOSTA = "resposta"  # alguém correu, aceitou ou aumentou
-    JANELA_CONVERSA = "janela-conversa"  # pede: ação de conversa
-    FIM_RODADA = "fim-rodada"
-    FIM_PONTO = "fim-ponto"
-    FIM_PARTIDA = "fim-partida"
-
-
-class Resposta(StrEnum):
-    CORRER = "correr"
-    ACEITAR = "aceitar"
-    AUMENTAR = "aumentar"
-
-
-class AcaoConversa(StrEnum):
-    ENVIAR = "enviar"
-    RECEBER = "receber"
-    ESPIONAR = "espionar"
-    BLEFAR = "blefar"
-    NADA = "nada"
-
-
-def criar_mensagem(destinatario: str, performativa: str, conteudo: dict) -> Message:
+def criar_mensagem(destinatario: str, performativa: Performativa, conteudo: dict) -> Message:
     """Monta a Message do SPADE. O remetente o SPADE preenche sozinho no envio.
 
     `conteudo` é um dicionário com a chave "evento" e os dados. O evento vai nos
@@ -52,7 +24,7 @@ def criar_mensagem(destinatario: str, performativa: str, conteudo: dict) -> Mess
         to=destinatario,
         body=json.dumps(dados),
         metadata={
-            "performative": performativa,
+            "performative": performativa.value,
             "ontology": ONTOLOGIA,
             "evento": evento.value,
         },

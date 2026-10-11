@@ -2,30 +2,13 @@
 
 Uma receita, vários botões: JogadorBDI implementa a receita uma vez só, e cada
 personalidade é uma subclasse que só troca a Personalidade (os botões) e, quando
-precisa, sobrescreve um dos três ganchos das regras especiais.
+precisa, sobrescreve um dos três ganchos das regras especiais. Todos os números
+(botões e constantes da receita) ficam em truco.config.
 """
 
-from dataclasses import dataclass
-
 from truco.agents.jogador import Jogador
-from truco.comunicacao import AcaoConversa, Evento, Resposta
-from truco.jogo import Carta, Categoria, Mao
-
-
-@dataclass(frozen=True)
-class Personalidade:
-    """Os botões da tabela da Seção 4 de Como os Agentes Decidem."""
-
-    vies_adversario: float
-    vies_parceiro: float
-    confianca: float
-    peso_placar: float
-    cautela: float
-    base_aumentar: float
-    abertura_3: tuple[float, float, float] | None  # forte/média/fraca; None = regra fixa
-    abertura_2: tuple[float, float] | None  # forte/fraca
-    conversa: dict[AcaoConversa, float]
-    sucesso_espionar: float
+from truco.config import AcaoConversa, Categoria, Evento, Personalidade, Resposta
+from truco.jogo import Carta, Mao
 
 
 class Crencas:

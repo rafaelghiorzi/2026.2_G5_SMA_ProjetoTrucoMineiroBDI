@@ -9,8 +9,8 @@ e Maluco com regras fixas.
 from spade.agent import Agent
 from spade.behaviour import CyclicBehaviour
 
-from truco.comunicacao import AcaoConversa, Evento, Resposta
-from truco.jogo import Carta, Categoria, Mao
+from truco.config import AcaoConversa, Categoria, Evento, Resposta
+from truco.jogo import Carta, Mao
 
 
 class OuvirMesa(CyclicBehaviour):

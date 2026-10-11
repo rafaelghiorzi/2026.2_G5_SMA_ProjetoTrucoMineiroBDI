@@ -4,7 +4,7 @@ Herdam só o protocolo de Jogador; não têm crenças nem conversa.
 """
 
 from truco.agents.jogador import Jogador
-from truco.comunicacao import Resposta
+from truco.config import Resposta
 from truco.jogo import Carta
 
 
