@@ -1,7 +1,7 @@
 [project]
 name = "truco"
 version = "0.1.0"
-description = "Sistema Multiagentes de Truco Mineiro com agentes BDI e FIPA-ACL"
+description = "Truco Mineiro multi-agent system with BDI agents and FIPA-ACL"
 readme = "README.md"
 authors = [
     { name = "rafaelghiorzi", email = "rafael.ghiorzi@gmail.com" },

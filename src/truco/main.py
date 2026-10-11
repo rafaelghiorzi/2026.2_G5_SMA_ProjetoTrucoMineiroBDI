@@ -1,4 +1,4 @@
-"""Ponto de entrada. Por enquanto só roda um agente one-shot de teste."""
+"""Entry point. For now it only runs a one-shot test agent."""
 
 import asyncio
 import spade
@@ -8,51 +8,51 @@ from spade.behaviour import OneShotBehaviour
 from truco.config import AGENT_PASSWORD, XMPP_DOMAIN
 
 
-class MeuComportamento(OneShotBehaviour):
+class MyBehaviour(OneShotBehaviour):
     agent: Agent
 
 
     async def on_start(self) -> None:
-        print("Iniciando comportamento one-shot de teste.")
+        print("Starting one-shot test behaviour.")
 
     async def run(self) -> None:
-        print("Comportamento one-shot de teste rodando.")
+        print("One-shot test behaviour running.")
         await asyncio.sleep(1)
-        print("Comportamento one-shot de teste finalizado.")
+        print("One-shot test behaviour finished.")
 
     async def on_end(self) -> None:
-        print("Comportamento one-shot de teste encerrado.")
+        print("One-shot test behaviour ended.")
         await self.agent.stop()
 
 
 
-class MeuAgente(Agent):
+class MyAgent(Agent):
     async def setup(self) -> None:
-        print(f"[{self.jid}] Configurando agente.")
+        print(f"[{self.jid}] Setting up agent.")
 
-        self.comportamento = MeuComportamento()
-        self.add_behaviour(self.comportamento)
+        self.behaviour = MyBehaviour()
+        self.add_behaviour(self.behaviour)
 
 
 async def main():
-    id = f"meu_agente@{XMPP_DOMAIN}"
+    id = f"my_agent@{XMPP_DOMAIN}"
 
-    agente = MeuAgente(id, AGENT_PASSWORD)
+    agent = MyAgent(id, AGENT_PASSWORD)
 
-    await agente.start()
-    print(f"[{id}] Agente iniciado.")
+    await agent.start()
+    print(f"[{id}] Agent started.")
 
-    while agente.is_alive():
+    while agent.is_alive():
         try:
             await asyncio.sleep(1)
         except KeyboardInterrupt:
-            print("Interrompido pelo usuário.")
+            print("Interrupted by the user.")
             break
 
-    assert agente.comportamento.exit_code == 10
-    await agente.stop()
+    assert agent.behaviour.exit_code == 10
+    await agent.stop()
 
-    print(f"[{id}] Agente encerrado.")
+    print(f"[{id}] Agent stopped.")
 
 
 def run() -> None:

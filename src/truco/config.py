@@ -1,7 +1,7 @@
-"""Configuração central: todo dado que o jogo e os agentes usam mora aqui.
+"""Central configuration: every piece of data the game and the agents use lives here.
 
-Este módulo não importa nada do projeto nem do SPADE, então qualquer arquivo
-pode importá-lo sem criar ciclos. As seções seguem os documentos em docs/.
+This module imports nothing from the project or from SPADE, so any file can
+import it without creating cycles. Sections follow the documents in docs/.
 """
 
 from dataclasses import dataclass
@@ -10,292 +10,292 @@ from typing import Literal, NamedTuple
 
 
 # ============================================================================
-# Sistema
+# System
 # ============================================================================
 
-# Servidor XMPP embutido do SPADE
+# SPADE's embedded XMPP server
 XMPP_DOMAIN = "localhost"
 AGENT_PASSWORD = "truco"
 
-ONTOLOGIA = "truco-mineiro"
-TEMPO_DE_JOGADA = 15  # segundos esperando uma jogada antes de pedir de novo
+ONTOLOGY = "truco-mineiro"
+TURN_TIMEOUT = 15  # seconds waiting for a play before asking again
 
 
 # ============================================================================
-# Cartas (Especificação 2.1)
+# Cards (Specification 2.1)
 # ============================================================================
 
-class Valor(StrEnum):
-    """Os 11 valores de carta. O texto é o código que viaja nas mensagens."""
+class Rank(StrEnum):
+    """The 11 card ranks. The text is the code that travels in messages."""
 
-    DAMA = "Q"
-    VALETE = "J"
-    REI = "K"
-    AS = "A"
-    DOIS = "2"
-    TRES = "3"
-    CURINGA = "CR"
-    SETE_DE_OUROS = "7O"
-    AS_DE_ESPADAS = "AE"
-    SETE_DE_COPAS = "7C"
-    ZAP = "4P"  # 4 de paus
-
-
-class InfoCarta(NamedTuple):
-    posicao: int  # quem ganha de quem: maior posição vence
-    copias: int  # quantas existem no baralho
+    QUEEN = "Q"
+    JACK = "J"
+    KING = "K"
+    ACE = "A"
+    TWO = "2"
+    THREE = "3"
+    JOKER = "JK"
+    SEVEN_OF_DIAMONDS = "7D"
+    ACE_OF_SPADES = "AS"
+    SEVEN_OF_HEARTS = "7H"
+    ZAP = "4C"  # 4 of clubs
 
 
-CARTAS: dict[Valor, InfoCarta] = {
-    Valor.DAMA: InfoCarta(posicao=1, copias=4),
-    Valor.VALETE: InfoCarta(posicao=2, copias=4),
-    Valor.REI: InfoCarta(posicao=3, copias=4),
-    Valor.AS: InfoCarta(posicao=4, copias=3),  # o quarto A é o de espadas
-    Valor.DOIS: InfoCarta(posicao=5, copias=4),
-    Valor.TRES: InfoCarta(posicao=6, copias=4),
-    Valor.CURINGA: InfoCarta(posicao=7, copias=2),
-    Valor.SETE_DE_OUROS: InfoCarta(posicao=8, copias=1),
-    Valor.AS_DE_ESPADAS: InfoCarta(posicao=9, copias=1),
-    Valor.SETE_DE_COPAS: InfoCarta(posicao=10, copias=1),
-    Valor.ZAP: InfoCarta(posicao=11, copias=1),
+class CardInfo(NamedTuple):
+    position: int  # who beats whom: higher position wins
+    copies: int  # how many exist in the deck
+
+
+CARDS: dict[Rank, CardInfo] = {
+    Rank.QUEEN: CardInfo(position=1, copies=4),
+    Rank.JACK: CardInfo(position=2, copies=4),
+    Rank.KING: CardInfo(position=3, copies=4),
+    Rank.ACE: CardInfo(position=4, copies=3),  # the fourth ace is the ace of spades
+    Rank.TWO: CardInfo(position=5, copies=4),
+    Rank.THREE: CardInfo(position=6, copies=4),
+    Rank.JOKER: CardInfo(position=7, copies=2),
+    Rank.SEVEN_OF_DIAMONDS: CardInfo(position=8, copies=1),
+    Rank.ACE_OF_SPADES: CardInfo(position=9, copies=1),
+    Rank.SEVEN_OF_HEARTS: CardInfo(position=10, copies=1),
+    Rank.ZAP: CardInfo(position=11, copies=1),
 }
 
-POSICAO_MANILHA = 8  # da posição 8 em diante é manilha
-POSICAO_MAXIMA = max(info.posicao for info in CARTAS.values())
-EXPOENTE_PODER = 1.5  # poder = (posição / máxima) ** expoente (Como os Agentes Decidem 3.1)
-CARTAS_POR_MAO = 3
+MANILHA_POSITION = 8  # from position 8 up, the card is a manilha
+MAX_POSITION = max(info.position for info in CARDS.values())
+POWER_EXPONENT = 1.5  # power = (position / max) ** exponent (How the Agents Decide 3.1)
+CARDS_PER_HAND = 3
 
 
 # ============================================================================
-# Times, pontuação e aposta (Especificação 2.4)
+# Teams, scoring and betting (Specification 2.4)
 # ============================================================================
 
-TIME = Literal["A", "B"]
-TIMES: tuple[TIME, TIME] = ("A", "B")
+TEAM = Literal["A", "B"]
+TEAMS: tuple[TEAM, TEAM] = ("A", "B")
 
-PONTOS_PARA_VENCER = 12
-NIVEIS_APOSTA = [1, 3, 6, 9, 12]  # sem pedido, truco, seis, nove, doze
-RODADA_MINIMA_PARA_PEDIR = 2
+POINTS_TO_WIN = 12
+BET_LEVELS = [1, 3, 6, 9, 12]  # no call, truco, six, nine, twelve
+MIN_ROUND_TO_CALL = 2
 
 
 # ============================================================================
-# Categoria da mão (Como os Agentes Decidem 3.2 e 3.3)
+# Hand category (How the Agents Decide 3.2 and 3.3)
 # ============================================================================
 
-class Categoria(StrEnum):
-    """Categoria da mão, usada em sinais e declarações."""
+class Category(StrEnum):
+    """Hand category, used in signals and declarations."""
 
-    FRACA = "fraca"
-    MEDIA = "media"
-    FORTE = "forte"
+    WEAK = "weak"
+    MEDIUM = "medium"
+    STRONG = "strong"
 
 
-LIMITE_FRACA = 0.35  # força abaixo disso: fraca
-LIMITE_FORTE = 0.60  # força a partir disso: forte
+WEAK_BELOW = 0.35  # strength below this: weak
+STRONG_FROM = 0.60  # strength from this up: strong
 
-# Força que cada categoria anunciada representa para quem ouve
-VALOR_DA_CATEGORIA: dict[Categoria, float] = {
-    Categoria.FRACA: 0.2,
-    Categoria.MEDIA: 0.5,
-    Categoria.FORTE: 0.8,
+# Strength each announced category stands for, to whoever hears it
+CATEGORY_VALUE: dict[Category, float] = {
+    Category.WEAK: 0.2,
+    Category.MEDIUM: 0.5,
+    Category.STRONG: 0.8,
 }
 
 
 # ============================================================================
-# Protocolo FIPA-ACL (Especificação 6)
+# FIPA-ACL protocol (Specification 6)
 # ============================================================================
 
-class Performativa(StrEnum):
+class Performative(StrEnum):
     INFORM = "inform"
     REQUEST = "request"
     PROPOSE = "propose"
-    ACEITAR = "accept-proposal"
-    RECUSAR = "reject-proposal"
+    ACCEPT = "accept-proposal"
+    REJECT = "reject-proposal"
 
 
-class Evento(StrEnum):
-    """O que circula entre mesa e jogadores. Os que pedem resposta estão marcados."""
+class Event(StrEnum):
+    """What flows between table and players. The ones that ask for an answer are marked."""
 
-    NOVO_PONTO = "novo-ponto"
-    SUA_VEZ = "sua-vez"  # pede: pedir? + carta
-    CARTA_JOGADA = "carta-jogada"
-    PEDIDO = "pedido"  # pede resposta, se for para mim
-    PEDE_DECLARACAO = "pede-declaracao"  # pede: categoria da mão
-    DECLARACAO = "declaracao"
-    RESPOSTA = "resposta"  # alguém correu, aceitou ou aumentou
-    JANELA_CONVERSA = "janela-conversa"  # pede: ação de conversa
-    FIM_RODADA = "fim-rodada"
-    FIM_PONTO = "fim-ponto"
-    FIM_PARTIDA = "fim-partida"
-
-
-class Resposta(StrEnum):
-    CORRER = "correr"
-    ACEITAR = "aceitar"
-    AUMENTAR = "aumentar"
+    NEW_POINT = "new-point"
+    YOUR_TURN = "your-turn"  # asks: call? + card
+    CARD_PLAYED = "card-played"
+    CALL = "call"  # asks for an answer, if it is addressed to me
+    ASK_DECLARATION = "ask-declaration"  # asks: hand category
+    DECLARATION = "declaration"
+    RESPONSE = "response"  # someone folded, accepted or raised
+    TALK_WINDOW = "talk-window"  # asks: talk action
+    ROUND_END = "round-end"
+    POINT_END = "point-end"
+    MATCH_END = "match-end"
 
 
-class AcaoConversa(StrEnum):
-    ENVIAR = "enviar"
-    RECEBER = "receber"
-    ESPIONAR = "espionar"
-    BLEFAR = "blefar"
-    NADA = "nada"
+class Response(StrEnum):
+    FOLD = "fold"
+    ACCEPT = "accept"
+    RAISE = "raise"
 
 
-# ============================================================================
-# Mesa (Especificação 3)
-# ============================================================================
-
-class FaseDaMesa(StrEnum):
-    """Nomes dos estados da máquina de estados da mesa."""
-
-    INICIO_PONTO = "INICIO_PONTO"
-    VEZ = "VEZ"
-    FIM_RODADA = "FIM_RODADA"
-    FIM_PONTO = "FIM_PONTO"
-    FIM_PARTIDA = "FIM_PARTIDA"
+class TalkAction(StrEnum):
+    SEND = "send"
+    LISTEN = "listen"
+    SPY = "spy"
+    BLUFF = "bluff"
+    NOTHING = "nothing"
 
 
 # ============================================================================
-# Receita de decisão, igual para todos (Como os Agentes Decidem 3 e Apêndice A)
+# Table (Specification 3)
 # ============================================================================
 
-# força_time = PESO_MINHA_MAO × força_mão + (1 − PESO_MINHA_MAO) × crença_parceiro
-PESO_MINHA_MAO = 0.7
+class TablePhase(StrEnum):
+    """Names of the states in the table's state machine."""
 
-# chance = 0,5 + COEFICIENTE_CARTAS × (1 − p) × (força_time − ameaça)
-#              + p × vantagem + PESO_SALDO_RODADAS × saldo
-COEFICIENTE_CARTAS = 1.3
-PESO_SALDO_RODADAS = 0.15
-
-# Somado às duas barras: à frente no placar, fica mais conservador
-PESO_VANTAGEM_NAS_BARRAS = 0.08
-
-# Chance mínima para aceitar valer mais que correr, por valor pedido (3.5)
-PONTO_DE_EQUILIBRIO: dict[int, float] = {3: 0.333, 6: 0.250, 9: 0.167, 12: 0.125}
-
-# Limites do palpite sobre a mão de outro jogador (o poder da Q até o máximo)
-PALPITE_MINIMO = 0.027
-PALPITE_MAXIMO = 1.0
-
-FATOR_SEM_RECEBER = 0.7  # confiança no parceiro de quem não escolheu "receber"
-CATEGORIA_DO_PEDIDO = Categoria.MEDIA  # pedir truco conta como anúncio disto (Especificação 6.4)
+    START_POINT = "START_POINT"
+    TURN = "TURN"
+    END_ROUND = "END_ROUND"
+    END_POINT = "END_POINT"
+    END_MATCH = "END_MATCH"
 
 
 # ============================================================================
-# Regras especiais de personalidade (Como os Agentes Decidem 3.3, 3.4 e 4)
+# Decision recipe, the same for everyone (How the Agents Decide 3 and Appendix A)
 # ============================================================================
 
-LOOSE_CANNON_VIES_POR_VANTAGEM = -0.20  # viés sobre adversários = isto × vantagem
-GRINDER_CONFIANCA_AMEACA = 0.65  # Grinder só ouve o adversário quando é ameaça
+# team_strength = OWN_HAND_WEIGHT × hand_strength + (1 − OWN_HAND_WEIGHT) × partner_belief
+OWN_HAND_WEIGHT = 0.7
 
-# Bônus de fuga do Maverick: PESO × (fugas + FUGAS_INICIAIS) / (pedidos + PEDIDOS_INICIAIS)
-BONUS_FUGA_PESO = 0.2
-BONUS_FUGA_FUGAS_INICIAIS = 1
-BONUS_FUGA_PEDIDOS_INICIAIS = 2
+# chance = 0.5 + CARD_COEFFICIENT × (1 − p) × (team_strength − threat)
+#              + p × advantage + ROUND_BALANCE_WEIGHT × round_balance
+CARD_COEFFICIENT = 1.3
+ROUND_BALANCE_WEIGHT = 0.15
+
+# Added to both thresholds: when ahead on the score, play more conservatively
+ADVANTAGE_WEIGHT_IN_THRESHOLDS = 0.08
+
+# Minimum chance for accepting to be worth more than folding, per value called (3.5)
+BREAK_EVEN: dict[int, float] = {3: 0.333, 6: 0.250, 9: 0.167, 12: 0.125}
+
+# Bounds of the guess about another player's hand (the queen's power up to the max)
+MIN_GUESS = 0.027
+MAX_GUESS = 1.0
+
+NOT_LISTENING_FACTOR = 0.7  # trust in the partner for whoever did not choose "listen"
+CALL_ANNOUNCES = Category.MEDIUM  # calling truco counts as announcing this (Specification 6.4)
 
 
 # ============================================================================
-# Personalidades (Como os Agentes Decidem 4)
+# Special personality rules (How the Agents Decide 3.3, 3.4 and 4)
 # ============================================================================
 
-class PesosAbertura(NamedTuple):
-    """Chance (%) de abrir a rodada com a carta forte, a do meio ou a fraca."""
+LOOSE_CANNON_BIAS_PER_ADVANTAGE = -0.20  # bias about opponents = this × advantage
+GRINDER_THREAT_TRUST = 0.65  # the Grinder only listens to opponents when it is a threat
 
-    forte: float
-    media: float
-    fraca: float
+# Maverick's fold bonus: WEIGHT × (folds + INITIAL_FOLDS) / (calls + INITIAL_CALLS)
+FOLD_BONUS_WEIGHT = 0.2
+FOLD_BONUS_INITIAL_FOLDS = 1
+FOLD_BONUS_INITIAL_CALLS = 2
+
+
+# ============================================================================
+# Personalities (How the Agents Decide 4)
+# ============================================================================
+
+class OpeningWeights(NamedTuple):
+    """Chance (%) of opening the round with the strong, the middle or the weak card."""
+
+    strong: float
+    medium: float
+    weak: float
 
 
 @dataclass(frozen=True)
-class Personalidade:
-    """Os botões de uma personalidade. A receita é a mesma; só estes números mudam."""
+class Personality:
+    """A personality's knobs. The recipe is the same; only these numbers change."""
 
-    vies_adversario: float  # quanto superestima (+) ou subestima (−) os adversários
-    vies_parceiro: float
-    confianca: float  # quanto acredita num anúncio (0 a 1)
-    peso_placar: float  # o "p": quanto o placar ocupa o lugar das cartas
-    cautela: float  # somada ao ponto de equilíbrio para correr
-    base_aumentar: float  # chance mínima para pedir ou aumentar
-    abertura_3: PesosAbertura | None  # None = regra fixa (Rational Shark)
-    abertura_2: PesosAbertura | None  # com 2 cartas não existe "média"
-    conversa: dict[AcaoConversa, float]  # % de cada ação na janela de conversa
-    sucesso_espionar: float
+    opponent_bias: float  # how much it overestimates (+) or underestimates (−) opponents
+    partner_bias: float
+    trust: float  # how much it believes an announcement (0 to 1)
+    score_weight: float  # the "p": how much the score takes the place of the cards
+    caution: float  # added to the break-even point to fold
+    raise_base: float  # minimum chance to call or raise
+    opening_3: OpeningWeights | None  # None = fixed rule (Rational Shark)
+    opening_2: OpeningWeights | None  # with 2 cards there is no "medium"
+    talk: dict[TalkAction, float]  # % of each action in the talk window
+    spy_success: float
 
 
-RATIONAL_SHARK = Personalidade(
-    vies_adversario=0.0,
-    vies_parceiro=0.0,
-    confianca=0.70,
-    peso_placar=0.0,
-    cautela=0.0,
-    base_aumentar=0.68,
-    abertura_3=None,
-    abertura_2=None,
-    conversa={
-        AcaoConversa.ENVIAR: 30,
-        AcaoConversa.RECEBER: 30,
-        AcaoConversa.ESPIONAR: 20,
-        AcaoConversa.BLEFAR: 5,
-        AcaoConversa.NADA: 15,
+RATIONAL_SHARK = Personality(
+    opponent_bias=0.0,
+    partner_bias=0.0,
+    trust=0.70,
+    score_weight=0.0,
+    caution=0.0,
+    raise_base=0.68,
+    opening_3=None,
+    opening_2=None,
+    talk={
+        TalkAction.SEND: 30,
+        TalkAction.LISTEN: 30,
+        TalkAction.SPY: 20,
+        TalkAction.BLUFF: 5,
+        TalkAction.NOTHING: 15,
     },
-    sucesso_espionar=0.50,
+    spy_success=0.50,
 )
 
-MAVERICK_BLUFFER = Personalidade(
-    vies_adversario=0.0,
-    vies_parceiro=0.0,
-    confianca=0.40,
-    peso_placar=0.0,
-    cautela=0.0,
-    base_aumentar=0.62,
-    abertura_3=PesosAbertura(forte=70, media=20, fraca=10),
-    abertura_2=PesosAbertura(forte=85, media=0, fraca=15),
-    conversa={
-        AcaoConversa.ENVIAR: 20,
-        AcaoConversa.RECEBER: 10,
-        AcaoConversa.ESPIONAR: 25,
-        AcaoConversa.BLEFAR: 35,
-        AcaoConversa.NADA: 10,
+MAVERICK_BLUFFER = Personality(
+    opponent_bias=0.0,
+    partner_bias=0.0,
+    trust=0.40,
+    score_weight=0.0,
+    caution=0.0,
+    raise_base=0.62,
+    opening_3=OpeningWeights(strong=70, medium=20, weak=10),
+    opening_2=OpeningWeights(strong=85, medium=0, weak=15),
+    talk={
+        TalkAction.SEND: 20,
+        TalkAction.LISTEN: 10,
+        TalkAction.SPY: 25,
+        TalkAction.BLUFF: 35,
+        TalkAction.NOTHING: 10,
     },
-    sucesso_espionar=0.70,
+    spy_success=0.70,
 )
 
-LOOSE_CANNON = Personalidade(
-    vies_adversario=0.0,  # o viés dele depende do placar: LOOSE_CANNON_VIES_POR_VANTAGEM
-    vies_parceiro=0.0,
-    confianca=0.85,
-    peso_placar=0.4,
-    cautela=-0.05,
-    base_aumentar=0.58,
-    abertura_3=PesosAbertura(forte=33, media=34, fraca=33),
-    abertura_2=PesosAbertura(forte=50, media=0, fraca=50),
-    conversa={
-        AcaoConversa.ENVIAR: 30,
-        AcaoConversa.RECEBER: 20,
-        AcaoConversa.ESPIONAR: 25,
-        AcaoConversa.BLEFAR: 15,
-        AcaoConversa.NADA: 10,
+LOOSE_CANNON = Personality(
+    opponent_bias=0.0,  # its bias depends on the score: LOOSE_CANNON_BIAS_PER_ADVANTAGE
+    partner_bias=0.0,
+    trust=0.85,
+    score_weight=0.4,
+    caution=-0.05,
+    raise_base=0.58,
+    opening_3=OpeningWeights(strong=33, medium=34, weak=33),
+    opening_2=OpeningWeights(strong=50, medium=0, weak=50),
+    talk={
+        TalkAction.SEND: 30,
+        TalkAction.LISTEN: 20,
+        TalkAction.SPY: 25,
+        TalkAction.BLUFF: 15,
+        TalkAction.NOTHING: 10,
     },
-    sucesso_espionar=0.45,
+    spy_success=0.45,
 )
 
-GRINDER = Personalidade(
-    vies_adversario=0.15,
-    vies_parceiro=-0.10,
-    confianca=0.80,  # só com o parceiro; com adversários: GRINDER_CONFIANCA_AMEACA ou 0
-    peso_placar=0.0,
-    cautela=0.10,
-    base_aumentar=0.75,
-    abertura_3=PesosAbertura(forte=10, media=25, fraca=65),
-    abertura_2=PesosAbertura(forte=15, media=0, fraca=85),
-    conversa={
-        AcaoConversa.ENVIAR: 20,
-        AcaoConversa.RECEBER: 40,
-        AcaoConversa.ESPIONAR: 10,
-        AcaoConversa.BLEFAR: 5,
-        AcaoConversa.NADA: 25,
+GRINDER = Personality(
+    opponent_bias=0.15,
+    partner_bias=-0.10,
+    trust=0.80,  # partner only; with opponents: GRINDER_THREAT_TRUST or 0
+    score_weight=0.0,
+    caution=0.10,
+    raise_base=0.75,
+    opening_3=OpeningWeights(strong=10, medium=25, weak=65),
+    opening_2=OpeningWeights(strong=15, medium=0, weak=85),
+    talk={
+        TalkAction.SEND: 20,
+        TalkAction.LISTEN: 40,
+        TalkAction.SPY: 10,
+        TalkAction.BLUFF: 5,
+        TalkAction.NOTHING: 25,
     },
-    sucesso_espionar=0.25,
+    spy_success=0.25,
 )

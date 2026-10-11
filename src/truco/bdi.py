@@ -1,108 +1,108 @@
-"""Raciocínio dos jogadores deliberativos (Especificação 4; Como os Agentes Decidem 3).
+"""Reasoning of the deliberative players (Specification 4; How the Agents Decide 3).
 
-Uma receita, vários botões: JogadorBDI implementa a receita uma vez só, e cada
-personalidade é uma subclasse que só troca a Personalidade (os botões) e, quando
-precisa, sobrescreve um dos três ganchos das regras especiais. Todos os números
-(botões e constantes da receita) ficam em truco.config.
+One recipe, many knobs: BDIPlayer implements the recipe only once, and each
+personality is a subclass that only swaps the Personality (the knobs) and, when
+needed, overrides one of the three hooks for the special rules. All numbers
+(knobs and recipe constants) live in truco.config.
 """
 
-from truco.agents.jogador import Jogador
-from truco.config import AcaoConversa, Categoria, Evento, Personalidade, Resposta
-from truco.jogo import Carta, Mao
+from truco.agents.player import Player
+from truco.config import Category, Event, Personality, Response, TalkAction
+from truco.game import Card, Hand
 
 
-class Crencas:
-    """Só fatos e anúncios brutos. A interpretação (viés, confiança) fica no agente,
-    porque depende da personalidade."""
+class Beliefs:
+    """Only facts and raw announcements. Interpreting them (bias, trust) is the agent's
+    job, because it depends on the personality."""
 
-    def novo_ponto(self, mao: Mao) -> None:
-        """Zera tudo que é do ponto. O histórico de fuga sobrevive."""
+    def new_point(self, hand: Hand) -> None:
+        """Resets everything that belongs to the point. The fold history survives."""
         raise NotImplementedError
 
-    def registrar_carta(self, jogador: str, carta: Carta) -> None:
+    def record_card(self, player: str, card: Card) -> None:
         raise NotImplementedError
 
-    def registrar_anuncio(self, sobre: str, categoria: Categoria, fonte: str) -> None:
-        """Vale o mais recente por jogador (3.3)."""
+    def record_announcement(self, about: str, category: Category, source: str) -> None:
+        """The most recent one per player is the one that counts (3.3)."""
         raise NotImplementedError
 
-    def registrar_resposta(self, jogador: str, resposta: Resposta) -> None:
-        """Alimenta o histórico de fuga (fugas / pedidos recebidos)."""
+    def record_response(self, player: str, response: Response) -> None:
+        """Feeds the fold history (folds / calls received)."""
         raise NotImplementedError
 
-    def cartas_nao_vistas(self) -> list[Carta]:
+    def unseen_cards(self) -> list[Card]:
         raise NotImplementedError
 
-    def vantagem(self) -> float:
+    def advantage(self) -> float:
         raise NotImplementedError
 
-    def saldo_rodadas(self) -> int:
+    def round_balance(self) -> int:
         raise NotImplementedError
 
 
-class JogadorBDI(Jogador):
-    personalidade: Personalidade  # cada subclasse define
+class BDIPlayer(Player):
+    personality: Personality  # each subclass defines it
 
     async def setup(self) -> None:
-        self.crencas = Crencas()
+        self.beliefs = Beliefs()
         await super().setup()
 
-    def perceber(self, evento: Evento, dados) -> None:
-        """Traduz cada evento em atualização de Crencas.
-        Lembrar: PEDIDO também é anúncio de "média" de quem pediu (Especificação 6.4)."""
+    def perceive(self, event: Event, data) -> None:
+        """Turns each event into a Beliefs update.
+        Remember: a CALL also counts as a "medium" announcement by the caller (Specification 6.4)."""
         raise NotImplementedError
 
-    # --- Receita comum (Como os Agentes Decidem 3.2–3.5, resumo no Apêndice A) ---
+    # --- Shared recipe (How the Agents Decide 3.2–3.5, summary in Appendix A) ---
 
-    def forca_mao(self) -> float:
-        """self.mao.forca; com a mão vazia, o poder da carta que jogou nesta rodada."""
+    def hand_strength(self) -> float:
+        """self.hand.strength; with an empty hand, the power of the card played this round."""
         raise NotImplementedError
 
-    def crenca_sobre(self, jogador: str) -> float:
-        """Palpite neutro -> + viés -> mistura com anúncio pela confiança."""
+    def belief_about(self, player: str) -> float:
+        """Neutral guess -> + bias -> mixed with announcements according to trust."""
         raise NotImplementedError
 
-    def chance_de_vencer(self) -> float:
+    def win_chance(self) -> float:
         raise NotImplementedError
 
-    def barra_correr(self, valor_pedido: int) -> float:
+    def fold_threshold(self, value_called: int) -> float:
         raise NotImplementedError
 
-    def barra_aumentar(self) -> float:
+    def raise_threshold(self) -> float:
         raise NotImplementedError
 
-    # --- Decisões (implementam o contrato de Jogador) ---
+    # --- Decisions (implement the Player contract) ---
 
-    def deve_pedir(self) -> bool:
+    def should_call(self) -> bool:
         raise NotImplementedError
 
-    def responder_pedido(self, valor_pedido: int) -> Resposta:
+    def answer_call(self, value_called: int) -> Response:
         raise NotImplementedError
 
-    def escolher_carta(self) -> Carta:
-        """Última carta / respondendo (regra igual p/ todos) / abrindo (gancho)."""
+    def choose_card(self) -> Card:
+        """Last card / answering (same rule for everyone) / opening (hook)."""
         raise NotImplementedError
 
-    def declarar(self) -> Categoria:
+    def declare(self) -> Category:
         raise NotImplementedError
 
-    def conversar(self) -> AcaoConversa:
-        """Sorteio com a tabela da personalidade + regras de bom senso (3.7)."""
+    def talk(self) -> TalkAction:
+        """Draw from the personality's table + common-sense rules (3.7)."""
         raise NotImplementedError
 
-    # --- Ganchos: o padrão lê os botões; personalidades especiais sobrescrevem ---
+    # --- Hooks: the default reads the knobs; special personalities override ---
 
-    def vies(self, jogador: str) -> float:
+    def bias(self, player: str) -> float:
         raise NotImplementedError
 
-    def confianca(self, emissor: str, categoria: Categoria, fonte: str) -> float:
-        """Inclui o ×0,7 de quem não escolheu "receber"."""
+    def trust(self, speaker: str, category: Category, source: str) -> float:
+        """Includes the ×0.7 for whoever did not choose "listen"."""
         raise NotImplementedError
 
-    def bonus_pedido(self) -> float:
-        """Somado à chance só para pedir/aumentar. Padrão: 0."""
+    def call_bonus(self) -> float:
+        """Added to the chance only for calling/raising. Default: 0."""
         return 0.0
 
-    def abrir_rodada(self) -> Carta:
-        """Padrão: sorteio com abertura_3 / abertura_2."""
+    def open_round(self) -> Card:
+        """Default: draw with opening_3 / opening_2."""
         raise NotImplementedError

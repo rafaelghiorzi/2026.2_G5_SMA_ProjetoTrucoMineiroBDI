@@ -1,1 +1,1 @@
-"""Sistema Multiagentes de Truco Mineiro com agentes BDI e FIPA-ACL."""
+"""Truco Mineiro multi-agent system with BDI agents and FIPA-ACL."""
