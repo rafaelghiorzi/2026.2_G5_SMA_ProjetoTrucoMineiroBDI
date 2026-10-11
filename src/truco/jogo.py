@@ -1,46 +1,11 @@
 import random
-from collections.abc import Iterator
-from dataclasses import dataclass, field
 from enum import StrEnum
 from statistics import mean
-from typing import Literal
+from collections.abc import Iterator
+from dataclasses import dataclass, field
 
-CARTAS = Literal["Q", "J", "K", "A", "2", "3", "CR", "7O", "AE", "7C", "4P"]
-TIME = Literal["A", "B"]
-NIVEIS_APOSTA = [1, 3, 6, 9, 12]
-POSICAO_MANILHA = 8  # 7O, AE, 7C e 4P
+from truco.config import CARTAS, TIME, NIVEIS_APOSTA, POSICAO_MANILHA, LIMITE_FRACA, LIMITE_FORTE, POSICOES, QUANTIDADES
 
-# Faixas de força da mão
-LIMITE_FRACA = 0.35
-LIMITE_FORTE = 0.60
-
-POSICOES: dict[str, int] = {
-    "Q" : 1,
-    "J" : 2,
-    "K" : 3,
-    "A" : 4,
-    "2" : 5,
-    "3" : 6,
-    "CR" : 7,    # Curinga
-    "7O" : 8,    # 7 de Ouros
-    "AE" : 9,    # A de Espadas
-    "7C" : 10,   # 7 de Copas
-    "4P" : 11    # 4 de Paus (Zap!)
-}
-
-QUANTIDADES: dict[CARTAS, int] = {
-    "Q" : 4,
-    "J" : 4,
-    "K" : 4,
-    "A" : 3,
-    "2" : 4,
-    "3" : 4,
-    "CR" : 2,    # Curinga
-    "7O" : 1,    # 7 de Ouros
-    "AE" : 1,    # A de Espadas
-    "7C" : 1,   # 7 de Copas
-    "4P" : 1    # 4 de Paus (Zap!)
-}
 
 def time_de(jogadores: list[str], jogador: str) -> TIME:
 
@@ -62,7 +27,6 @@ class Carta:
     @property
     def manilha(self) -> bool:
         return self.posicao >= POSICAO_MANILHA
-
 
 class Categoria(StrEnum):
     """Categoria da mão, usada em sinais e declarações (Como os Agentes Decidem 3.2)."""
@@ -122,7 +86,6 @@ class Mao:
         vencedoras = [carta for carta in self.cartas if carta.posicao > alvo.posicao]
         return min(vencedoras, key=lambda carta: carta.posicao, default=None)
 
-
 @dataclass
 class Baralho:
     cartas: list[Carta] = field(init=False)
@@ -152,7 +115,6 @@ class Baralho:
         for jogador in jogadores:
             maos[jogador] = Mao([self.cartas.pop() for _ in range(3)])
         return maos
-
 
 # Uma rodada na mesa: (jogador, carta) na ordem em que foram jogadas
 CartasNaMesa = list[tuple[str, Carta]]
@@ -242,7 +204,6 @@ class Ponto:
     def vencedor_ponto(self) -> TIME | None:
         """Só faz sentido com o ponto encerrado. None = ninguém pontua."""
         return self._decisao()[1]
-
 
 @dataclass
 class Aposta:

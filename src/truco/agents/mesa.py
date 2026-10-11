@@ -1,38 +1,25 @@
-"""Mesa: árbitro e ambiente (Especificação, Seção 3). Reativa, máquina de estados.
-
-As regras moram em truco.jogo; a mesa só guarda o quadro, conversa com os
-jogadores e chama as regras na hora certa.
-
-Fluxo sem truco (passos 1 a 3):
-
-    INICIO_PONTO -> VEZ -> (4 cartas?) -> FIM_RODADA -> (ponto acabou?) -> FIM_PONTO
-                     ^                        |                                |
-                     +------- não ------------+          (alguém fez 12?) não -+-> INICIO_PONTO
-                                                                       sim -> FIM_PARTIDA
-"""
-
 import random
-
+from typing import cast
 from spade.agent import Agent
-from spade.behaviour import FSMBehaviour, State
 from spade.message import Message
+from spade.behaviour import FSMBehaviour, State
 
+from truco.config import CARTAS, TIME
+from truco.jogo import Aposta, Baralho, Carta, CartasNaMesa, Mao, Ponto
 from truco.comunicacao import Evento, criar_mensagem, ler_mensagem, template_do_jogo
-from truco.jogo import Aposta, Baralho, Carta, CartasNaMesa, Mao, Ponto, TIME
 
-INICIO_PONTO = "INICIO_PONTO"
 VEZ = "VEZ"
-FIM_RODADA = "FIM_RODADA"
 FIM_PONTO = "FIM_PONTO"
+FIM_RODADA = "FIM_RODADA"
 FIM_PARTIDA = "FIM_PARTIDA"
+INICIO_PONTO = "INICIO_PONTO"
 
+TEMPO_DE_JOGADA = 15
 PONTOS_PARA_VENCER = 12
-TEMPO_DE_JOGADA = 30  # segundos esperando uma jogada antes de pedir de novo
 
 
 class EstadoMesa(State):
     """Base dos estados: só dá ao editor o tipo certo de self.agent."""
-
     agent: "MesaAgent"
 
     async def avisar_todos(self, conteudo: dict) -> None:
@@ -125,7 +112,10 @@ class Vez(EstadoMesa):
             return None
         if str(msg.sender.bare) != mesa.vez:  # bare: sem o sufixo de conexão (/recurso)
             return None
-        carta = Carta(dados.get("carta"))
+        valor = dados.get("carta")
+        if not isinstance(valor, str):
+            return None
+        carta = Carta(cast(CARTAS, valor))
         if carta not in mesa.maos[mesa.vez]:
             return None
         return carta
@@ -133,35 +123,68 @@ class Vez(EstadoMesa):
 
 class FimRodada(EstadoMesa):
     async def run(self) -> None:
-        # TODO:
-        # 1. ponto.registrar_rodada(cartas_na_mesa) e avisar os 4 (FIM_RODADA)
-        # 2. ponto.encerrada -> FIM_PONTO
-        # 3. senão: vez = ponto.quem_comeca(...), limpar a mesa -> VEZ
-        raise NotImplementedError
+        mesa = self.agent
+
+        # 1. Registrar rodada
+        vencedor = mesa.ponto.registrar_rodada(mesa.cartas_na_mesa)
+
+        # 2. Avisar todos os jogadores
+        await self.avisar_todos({
+            "evento": Evento.FIM_RODADA,
+            "vencedor": vencedor
+            })
+
+        # 3. Encerrar o ponto
+        if mesa.ponto.encerrada:
+            self.set_next_state(FIM_PONTO)
+        else:
+            mesa.vez = mesa.ponto.quem_comeca(mesa.cartas_na_mesa)
+            mesa.cartas_na_mesa = []
+            self.set_next_state(VEZ)
 
 
 class FimPonto(EstadoMesa):
     async def run(self) -> None:
-        # TODO:
-        # 1. vencedor_ponto() leva aposta.valor pontos (None = ninguém pontua)
-        # 2. avisar os 4 (FIM_PONTO) com o placar
-        # 3. alguém >= PONTOS_PARA_VENCER -> FIM_PARTIDA
-        # 4. senão: abridor anda um assento -> INICIO_PONTO
-        raise NotImplementedError
+        mesa = self.agent
+
+        vencedor = mesa.ponto.vencedor_ponto()
+        if vencedor is not None:
+            mesa.placar[vencedor] += mesa.aposta.valor
+
+        await self.avisar_todos({
+            "evento" : Evento.FIM_PONTO,
+            "vencedor": vencedor,
+            "placar": mesa.placar
+        })
+
+        for pontos in mesa.placar.values():
+            if pontos >= PONTOS_PARA_VENCER:
+                self.set_next_state(FIM_PARTIDA)
+                break
+        else:
+            mesa.abridor = mesa.proximo(mesa.abridor)
+            self.set_next_state(INICIO_PONTO)
 
 
 class FimPartida(EstadoMesa):
     """Estado final: sem transição de saída, o FSM para aqui."""
 
     async def run(self) -> None:
-        # TODO: avisar os 4 (FIM_PARTIDA) e parar a mesa
-        raise NotImplementedError
+        mesa = self.agent
+
+        await self.avisar_todos({
+            "evento" : Evento.FIM_PARTIDA,
+            "placar" : mesa.placar
+
+        })
+
+        await mesa.stop()
 
 
 class MesaAgent(Agent):
     def __init__(self, jid: str, password: str, jogadores: list[str], semente: int | None = None):
         super().__init__(jid, password)
-        # O quadro (Especificação 3): tudo que a mesa sabe fica aqui, e os estados leem/escrevem
+        # Quadro de informações: tudo que a mesa sabe fica aqui, e os estados leem/escrevem
         self.jogadores = jogadores  # ordem dos assentos: A, B, A, B
         self.rng = random.Random(semente)
         self.placar: dict[TIME, int] = {"A": 0, "B": 0}
