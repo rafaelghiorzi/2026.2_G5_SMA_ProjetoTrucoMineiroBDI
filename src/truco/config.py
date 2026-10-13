@@ -117,11 +117,12 @@ class Event(StrEnum):
     """What flows between table and players. The ones that ask for an answer are marked."""
 
     NEW_POINT = "new-point"
-    YOUR_TURN = "your-turn"  # asks: call? + card
+    YOUR_TURN = "your-turn"  # asks: a card, or a call when can_call is true
     CARD_PLAYED = "card-played"
-    CALL = "call"  # asks for an answer, if it is addressed to me
-    ASK_DECLARATION = "ask-declaration"  # asks: hand category
+    CALL = "call"  # player asks for truco/raise; then the table's public notice of it
+    ASK_DECLARATION = "ask-declaration"  # asks: hand category (or null to skip)
     DECLARATION = "declaration"
+    ASK_RESPONSE = "ask-response"  # asks the responder: fold, accept or raise
     RESPONSE = "response"  # someone folded, accepted or raised
     TALK_WINDOW = "talk-window"  # asks: talk action
     ROUND_END = "round-end"
@@ -152,6 +153,8 @@ class TablePhase(StrEnum):
 
     START_POINT = "START_POINT"
     TURN = "TURN"
+    DECLARE = "DECLARE"
+    AWAIT_ANSWER = "AWAIT_ANSWER"
     END_ROUND = "END_ROUND"
     END_POINT = "END_POINT"
     END_MATCH = "END_MATCH"

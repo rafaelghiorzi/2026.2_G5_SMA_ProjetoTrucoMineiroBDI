@@ -206,6 +206,11 @@ class Point:
         return False, None
 
     @property
+    def current_round(self) -> int:
+        """Number of the round being played now: 1, 2 or 3."""
+        return len(self.results) + 1
+
+    @property
     def finished(self) -> bool:
         return self._decision()[0]
 

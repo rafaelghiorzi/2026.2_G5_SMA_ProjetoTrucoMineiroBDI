@@ -28,19 +28,19 @@ class ListenToTable(CyclicBehaviour):
         # 2. event, data = read_message(msg)
         # 3. self.agent.perceive(event, data)   (every notice updates the state)
         # 4. if the event asks for an action, dispatch to the right method:
-        #      YOUR_TURN        -> await self.act_on_turn()
-        #      CALL (to me)     -> answer_call
-        #      ASK_DECLARATION  -> declare
-        #      TALK_WINDOW      -> talk
+        #      YOUR_TURN        -> await self.act_on_turn(data["can_call"])
+        #      ASK_DECLARATION  -> declare()      -> DECLARATION {"category": ... or None}
+        #      ASK_RESPONSE     -> answer_call()  -> RESPONSE {"response": fold/accept/raise}
+        #      TALK_WINDOW      -> talk()         (the table does not send it yet)
         #      MATCH_END        -> self.kill()
+        #    CALL, DECLARATION and RESPONSE are only notices: perceive() is enough.
         raise NotImplementedError
 
-    async def act_on_turn(self) -> None:
-        """Call before playing (if it wants to) and then play the card.
+    async def act_on_turn(self, can_call: bool) -> None:
+        """Either call truco (only when can_call and should_call()) or play a card.
 
-        If it calls, the play only happens after the table announces the call
-        was accepted (Specification 2.4, rule 8) — so this method may need to
-        wait for the answer or be split into two events.
+        No waiting needed: if the call is accepted, the table sends YOUR_TURN
+        again (Specification 2.4, rule 8) and this method runs once more.
         """
         raise NotImplementedError
 
