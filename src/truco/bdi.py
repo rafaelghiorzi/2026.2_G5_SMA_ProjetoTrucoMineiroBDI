@@ -6,21 +6,45 @@ needed, overrides one of the three hooks for the special rules. All numbers
 (knobs and recipe constants) live in truco.config.
 """
 
+from collections import Counter
+
 from truco.agents.player import Player
 from truco.config import Category, Event, Personality, Response, TalkAction
-from truco.game import Card, Hand
+from truco.game import Card, Deck, Hand
+
+# The 29 cards, counted by rank (there are 4 queens, 2 jokers...)
+FULL_DECK: Counter[Card] = Counter(Deck().cards)
 
 
 class Beliefs:
     """Only facts and raw announcements. Interpreting them (bias, trust) is the agent's
     job, because it depends on the personality."""
 
+    def __init__(self, me: str, partner: str, opponents: list[str]) -> None:
+        self.me = me
+        self.partner = partner
+        self.opponents = list(opponents)
+        self.hand = Hand()
+        self.played: dict[str, list[Card]] = {}  # cards each player put on the table this point
+
+    @property
+    def everyone(self) -> list[str]:
+        return [self.me, self.partner, *self.opponents]
+
     def new_point(self, hand: Hand) -> None:
-        """Resets everything that belongs to the point. The fold history survives."""
-        raise NotImplementedError
+        """Resets everything that belongs to the point. The fold history survives.
+
+        `hand` is kept by reference: it is the same object as the agent's hand, and
+        record_card is the one that removes my cards from it when the table confirms.
+        """
+        self.hand = hand
+        self.played = {player: [] for player in self.everyone}
 
     def record_card(self, player: str, card: Card) -> None:
-        raise NotImplementedError
+        """A card on the table is a fact (Specification 4.1). If it is mine, it leaves my hand."""
+        self.played[player].append(card)
+        if player == self.me:
+            self.hand.remove(card)
 
     def record_announcement(self, about: str, category: Category, source: str) -> None:
         """The most recent one per player is the one that counts (3.3)."""
@@ -31,7 +55,11 @@ class Beliefs:
         raise NotImplementedError
 
     def unseen_cards(self) -> list[Card]:
-        raise NotImplementedError
+        """The deck minus my cards and every card already played (How the Agents Decide 3.3)."""
+        seen = Counter(self.hand)
+        for cards in self.played.values():
+            seen.update(cards)
+        return list((FULL_DECK - seen).elements())
 
     def advantage(self) -> float:
         raise NotImplementedError
@@ -44,7 +72,7 @@ class BDIPlayer(Player):
     personality: Personality  # each subclass defines it
 
     async def setup(self) -> None:
-        self.beliefs = Beliefs()
+        self.beliefs = Beliefs(str(self.jid.bare), self.partner, self.opponents)
         await super().setup()
 
     def perceive(self, event: Event, data) -> None:
