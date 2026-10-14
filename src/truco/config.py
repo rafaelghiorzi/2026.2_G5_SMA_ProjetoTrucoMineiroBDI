@@ -18,6 +18,7 @@ XMPP_DOMAIN = "localhost"
 AGENT_PASSWORD = "truco"
 
 ONTOLOGY = "truco-mineiro"
+TALK_TIMEOUT = 15  # seconds waiting for a play before asking again
 TURN_TIMEOUT = 15  # seconds waiting for a play before asking again
 
 
@@ -151,6 +152,7 @@ class TalkAction(StrEnum):
 class TablePhase(StrEnum):
     """Names of the states in the table's state machine."""
 
+    PLAYER_TALK = "PLAYER_TALK"
     START_POINT = "START_POINT"
     TURN = "TURN"
     DECLARE = "DECLARE"

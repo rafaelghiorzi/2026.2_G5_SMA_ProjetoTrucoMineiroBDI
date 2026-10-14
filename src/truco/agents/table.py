@@ -94,7 +94,21 @@ class StartPoint(TableState):
 
         # 4. Who opens the 1st round of this point. From here on, the Turn state takes over.
         table.turn = table.opener
-        self.set_next_state(TablePhase.TURN)
+        self.set_next_state(TablePhase.PLAYER_TALK)
+
+
+class PlayerTalk(TableState):
+    async def run(self) -> None:
+        table = self.agent
+        # TODO
+        # liberar os quatro agentes para conversarem pelo blackboard
+        await self.notify_all({
+            "event": Event.TALK_WINDOW
+        })
+
+        # esperar que a comunicação se encerre 
+        self.set_next_state(TablePhase.START_POINT)
+    pass
 
 
 class Turn(TableState):
@@ -348,6 +362,7 @@ class TableAgent(Agent):
     async def setup(self) -> None:
         flow = FSMBehaviour()
         flow.add_state(TablePhase.START_POINT, StartPoint(), initial=True)
+        flow.add_state(TablePhase.PLAYER_TALK, PlayerTalk())
         flow.add_state(TablePhase.TURN, Turn())
         flow.add_state(TablePhase.DECLARE, Declare())
         flow.add_state(TablePhase.AWAIT_ANSWER, AwaitAnswer())
@@ -356,6 +371,7 @@ class TableAgent(Agent):
         flow.add_state(TablePhase.END_MATCH, EndMatch())
 
         flow.add_transition(TablePhase.START_POINT, TablePhase.TURN)
+        # flow.add_transition(TablePhase.PLAYER_TALK, TablePhase.TURN)
         flow.add_transition(TablePhase.TURN, TablePhase.TURN)
         flow.add_transition(TablePhase.TURN, TablePhase.END_ROUND)
         flow.add_transition(TablePhase.TURN, TablePhase.DECLARE)
