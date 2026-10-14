@@ -46,7 +46,6 @@ class ListenToTable(CyclicBehaviour):
 
 
 class Player(Agent):
-    """Shared base. Knows who the table, the partner and the opponents are."""
 
     def __init__(self, jid: str, password: str, table: str, partner: str, opponents: list[str]):
         super().__init__(jid, password)
