@@ -144,6 +144,15 @@ class TalkAction(StrEnum):
     NOTHING = "nothing"
 
 
+class Source(StrEnum):
+    """Where an announcement came from (How the Agents Decide 3.3: four sources)."""
+
+    PARTNER_SIGNAL = "partner-signal"  # signal from my partner in the talk window
+    SPIED_SIGNAL = "spied-signal"  # opponent's signal (or bluff) I intercepted
+    DECLARATION = "declaration"  # public declaration before answering a call
+    CALL = "call"  # asking for truco counts as announcing CALL_ANNOUNCES
+
+
 # ============================================================================
 # Table (Specification 3)
 # ============================================================================
