@@ -289,14 +289,13 @@ class TrucoBehaviour(CyclicBehaviour):
         return self.win_chance() > self.call_threshold()    
 
     def answer_call(self, value_called: int) -> Response:
-        """Someone called: fold, accept or raise (3.5)."""
-        # TODO:
-        # - fold   if win_chance() < fold_threshold(value_called)  (WITHOUT call_bonus: the
-        #          opponent's fold history does not change the risk of accepting)
-        # - raise  if the rules allow it and win_chance() + call_bonus() > raise_threshold()
-        #          (the table only knows "can raise" inside Bet.can_call; it does not send it yet)
-        # - accept otherwise
-        raise NotImplementedError
+        """Someone called: fold, accept or raise"""
+        chance = self.win_chance()
+        if chance < self.fold_threshold(value_called):
+            return Response.FOLD
+        if chance > self.raise_threshold():
+            return Response.RAISE
+        return Response.ACCEPT
 
     def choose_card(self) -> Card:
         """Which card to play (Specification 4.5; How the Agents Decide 3.6)."""
@@ -306,9 +305,6 @@ class TrucoBehaviour(CyclicBehaviour):
         #    - the highest card on the table is my partner's (and no opponent card ties it):
         #      play the weakest;
         #    - otherwise the weakest that still beats it (Hand.weakest_that_beats);
-        #    - if none beats it, the weakest.
-        #    The cards of the current round are the last ones in self.agent.played of each player.
-        # 3. Opening the round: self.open_round() (the personality decides).
         raise NotImplementedError
 
     def declare(self) -> Category | None:
