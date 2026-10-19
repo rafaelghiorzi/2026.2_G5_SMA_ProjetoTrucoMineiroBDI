@@ -285,9 +285,8 @@ class TrucoBehaviour(CyclicBehaviour):
     # --- Decisions (Specification 4.4). Same rule for every personality. ---
 
     def should_call(self) -> bool:
-        """On my turn, from the 2nd round: call truco (or raise)? (3.5)"""
-        # TODO: win_chance() + call_bonus() > raise_threshold()
-        raise NotImplementedError
+        """Call truco if the chance of winning the point is above the threshold (3.5)."""
+        return self.win_chance() > self.call_threshold()    
 
     def answer_call(self, value_called: int) -> Response:
         """Someone called: fold, accept or raise (3.5)."""
