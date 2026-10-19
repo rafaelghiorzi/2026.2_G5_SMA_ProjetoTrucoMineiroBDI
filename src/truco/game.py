@@ -1,9 +1,14 @@
-"""Game rules, without SPADE (Specification, Section 2). The numbers come from truco.config."""
+"""Game rules, without SPADE (Specification, Section 2). The numbers come from truco.config.
+
+Players are identified by their JID (slixmpp's type, the same one SPADE uses).
+"""
 
 import random
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from statistics import mean
+
+from slixmpp import JID
 
 from truco.config import (
     BET_LEVELS,
@@ -22,7 +27,7 @@ from truco.config import (
 )
 
 
-def team_of(players: list[str], player: str) -> TEAM:
+def team_of(players: list[JID], player: JID) -> TEAM:
 
     """Seats alternate teams: 1st and 3rd are A, 2nd and 4th are B."""
     return TEAMS[players.index(player) % 2]
@@ -114,9 +119,9 @@ class Deck:
         """Shuffles the deck"""
         self.rng.shuffle(self.cards)
 
-    def deal(self, players: list[str]) -> dict[str, Hand]:
+    def deal(self, players: list[JID]) -> dict[JID, Hand]:
         """
-        Receives the list of player agents' JIDs
+        Receives the players' JIDs
         Returns a dictionary player -> hand
         """
         hands = {}
@@ -125,7 +130,7 @@ class Deck:
         return hands
 
 # One round on the table: (player, card) in the order they were played
-CardsOnTable = list[tuple[str, Card]]
+CardsOnTable = list[tuple[JID, Card]]
 
 @dataclass
 class Point:
@@ -134,7 +139,7 @@ class Point:
 
     The player list comes in A-B-A-B order. The table creates a new Point for each point.
     """
-    players: list[str]
+    players: list[JID]
     results: list[TEAM | None] = field(default_factory=list)  # None = tie
 
     def round_winner(self, cards_on_table: CardsOnTable) -> TEAM | None:
@@ -157,7 +162,7 @@ class Point:
         self.results.append(winner)
         return winner
 
-    def who_starts(self, cards_on_table: CardsOnTable) -> str:
+    def who_starts(self, cards_on_table: CardsOnTable) -> JID:
         """
         The winner starts. If the partners tied
         on the winning card, whoever played first starts.
@@ -225,10 +230,10 @@ class Bet:
     or raise_bet(). Raising means accepting the current level and calling the next one.
     """
 
-    players: list[str]
+    players: list[JID]
     value: int = 1                      # how much the point is worth now
     pending: int | None = None          # value called, waiting for an answer
-    caller: str | None = None
+    caller: JID | None = None
     last_team: TEAM | None = None       # who made the last raise (rule 7)
 
     def _next_level(self) -> int | None:
@@ -236,7 +241,7 @@ class Bet:
         i = BET_LEVELS.index(current)
         return BET_LEVELS[i + 1] if i + 1 < len(BET_LEVELS) else None
 
-    def can_call(self, player: str, round_number: int) -> bool:
+    def can_call(self, player: JID, round_number: int) -> bool:
         """
         Valid both for calling on one's turn and for raising when answering.
         The table still checks whether it is their turn (rule 2) or whether they are the one answering.
@@ -247,12 +252,12 @@ class Bet:
             and team_of(self.players, player) != self.last_team
         )
 
-    def responder(self, caller: str) -> str:
+    def responder(self, caller: JID) -> JID:
         """The next one in play order, who is always from the other team."""
         i = self.players.index(caller)
         return self.players[(i + 1) % len(self.players)]
 
-    def call(self, player: str) -> int:
+    def call(self, player: JID) -> int:
         """Opens the call and returns the value called. Validate first with can_call."""
         level = self._next_level()
         assert level is not None
@@ -272,7 +277,7 @@ class Bet:
         self.pending = None
         return team_of(self.players, self.caller), self.value
 
-    def raise_bet(self, player: str) -> int:
+    def raise_bet(self, player: JID) -> int:
         """Accepts the current call and calls the next level."""
         self.accept()
         return self.call(player)

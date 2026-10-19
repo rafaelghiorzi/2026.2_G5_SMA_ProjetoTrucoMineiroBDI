@@ -1,11 +1,12 @@
 import asyncio
 from typing import NotRequired, TypedDict
 
+from slixmpp import JID
 from spade.agent import Agent
 from spade.behaviour import FSMBehaviour, State
 from spade.message import Message
 
-from truco.communication import create_message, read_message, game_template
+from truco.communication import create_message, read_message, game_template, sender_of
 from truco.config import (
     TALK_TIMEOUT,
     Category,
@@ -29,21 +30,20 @@ class Inactive(BoardState):
             """Dados enviados no payload para abrir uma rodada: número e ordem dos jogadores."""
     
             round: int
-            players: list[str]
+            players: list[str]  # JIDs as text, as they travel in the message
 
     async def run(self) -> None:
         while True:
             msg = await self.receive()
             if msg is None: continue
-            sender = str(msg.sender)
-            if sender != self.agent.table: continue
+            if sender_of(msg) != self.agent.table: continue
 
             got, data = read_message(msg)
             if got != Event.OPEN or msg.get_metadata("performative") != Performative.REQUEST: continue
         
             try:
                 self.agent.round = int(data.pop("round"))
-                self.agent.players = data.pop("players")
+                self.agent.players = [JID(player) for player in data.pop("players")]
                 await self.send(create_message(self.agent.table, Performative.ACCEPT, {"event": Event.OPEN}))
                 self.set_next_state(BoardPhase.OPEN)
             except:
@@ -63,8 +63,8 @@ class Open(BoardState):
         action: TalkAction
         value: Open.Content # Category.WEAK / MEDIUM / STRONG
 
-    def valid_message(self, msg: Message, expected_players: set, received_players: set) ->tuple[str, dict] | None:
-        sender = str(msg.sender.bare)
+    def valid_message(self, msg: Message, expected_players: set[JID], received_players: set[JID]) ->tuple[JID, dict] | None:
+        sender = sender_of(msg)
         if sender not in expected_players or sender in received_players:
             return None
         
@@ -82,7 +82,7 @@ class Open(BoardState):
     
     async def run(self):
         expected_players = set(self.agent.players)
-        received_players = set()
+        received_players: set[JID] = set()
         deadline = asyncio.get_running_loop().time() + TALK_TIMEOUT
 
         while not expected_players.issubset(received_players):
@@ -133,14 +133,14 @@ class Processing(BoardState):
     class OutputToPlayerPayload(TypedDict):
         round: int
         action: TalkAction
-        value: dict[str, str | Category | None]
+        value: dict[str, str | Category | None]  # key: player JID as text
 
 
     class DeclarationPayload(TypedDict):
         action: TalkAction
-        value: dict[str, Category | None]
+        value: dict[str, Category | None]  # key: player JID as text
 
-    def get_teams_info(self, player: str) -> tuple[str, tuple[str, str]]:
+    def get_teams_info(self, player: JID) -> tuple[JID, tuple[JID, JID]]:
         p = self.agent.players.index(player)
         teammate = self.agent.players[(p+2) % 4]
         opponents = (self.agent.players[(p+1) % 4], self.agent.players[(p+3) % 4])
@@ -186,13 +186,13 @@ class Board:
     def write(
         self,
         round: int,
-        player: str,
+        player: JID,
         content: dict[str, object],
     ) -> None:
         """Grava ou substitui os dados de um jogador na rodada."""
         self.data.setdefault(round, {})[player] = dict(content)
 
-    def read(self, round: int, player: str) -> dict[str, object]:
+    def read(self, round: int, player: JID) -> dict[str, object]:
         """Recupera os dados indexados por jogador; retorna None se algum não existir."""
         round_messages = self.data[round]
         player_message = round_messages[player]
@@ -202,8 +202,8 @@ class Board:
 class BlackBoardAgent(Agent):
     """Agente que mantém os dados do Blackboard e executa seu FSM de estados."""
 
-    def __init__(self, jid: str, password: str, table: str, players: list[str], round: int):
-        super().__init__(jid, password)
+    def __init__(self, jid: JID, password: str, table: JID, players: list[JID], round: int):
+        super().__init__(str(jid), password)
         self.table = table
         self.players = players
         self.round = round

@@ -17,6 +17,7 @@ from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from statistics import mean
 
+from slixmpp import JID
 from spade.agent import Agent
 from spade.behaviour import CyclicBehaviour
 
@@ -114,7 +115,7 @@ class TrucoBehaviour(CyclicBehaviour):
             Event.READING: self.on_reading,
         }
 
-    async def tell(self, recipient: str, performative: Performative, content: dict) -> None:
+    async def tell(self, recipient: JID, performative: Performative, content: dict) -> None:
         await self.send(create_message(recipient, performative, content))
 
     # --- Notices: they only update the beliefs (Specification 4.1) ---
@@ -126,23 +127,23 @@ class TrucoBehaviour(CyclicBehaviour):
     async def on_card_played(self, data: dict) -> None:
         """A card on the table is a fact. If it is mine, this is the table confirming it,
         and only now it leaves my hand."""
-        player, card = data["player"], Card(Rank(data["card"]))
+        player, card = JID(data["player"]), Card(Rank(data["card"]))
         self.agent.played[player].append(card)
         if player == self.agent.me:
             self.agent.hand.remove(card)
 
     async def on_call(self, data: dict) -> None:
         """Calling truco counts as announcing a medium hand (Specification 6.4)."""
-        self.agent.announcements[data["player"]] = Announcement(CALL_ANNOUNCES, Source.CALL)
+        self.agent.announcements[JID(data["player"])] = Announcement(CALL_ANNOUNCES, Source.CALL)
 
     async def on_declaration(self, data: dict) -> None:
-        self.agent.announcements[data["player"]] = Announcement(
+        self.agent.announcements[JID(data["player"])] = Announcement(
             Category(data["category"]), Source.DECLARATION
         )
 
     async def on_response(self, data: dict) -> None:
         """Feeds the fold history (folds / calls received). Raising is not folding."""
-        player = data["player"]
+        player = JID(data["player"])
         self.agent.calls_received[player] += 1
         if Response(data["response"]) == Response.FOLD:
             self.agent.folds[player] += 1
@@ -228,7 +229,7 @@ class TrucoBehaviour(CyclicBehaviour):
             return self.agent.hand.strength
         return self.agent.played[self.agent.me][-1].power
 
-    def belief_about(self, player: str) -> float:
+    def belief_about(self, player: JID) -> float:
         """Neutral guess -> + bias -> mixed with announcements according to trust (3.3)."""
         # 1. Neutral guess: mean power of the cards I have not seen
         neutral = mean(card.power for card in self.unseen_cards())
@@ -329,11 +330,11 @@ class TrucoBehaviour(CyclicBehaviour):
     # CyclicBehaviour already uses ABCMeta, so @abstractmethod is enforced here.
 
     @abstractmethod
-    def bias(self, player: str) -> float:
+    def bias(self, player: JID) -> float:
         """How much I shift my guess about `player` (3.3)."""
 
     @abstractmethod
-    def trust(self, speaker: str, category: Category, source: Source) -> float:
+    def trust(self, speaker: JID, category: Category, source: Source) -> float:
         """How much I believe an announcement about `speaker` (3.3).
 
         The ×0.7 for whoever did not choose "listen" is applied by belief_about, on top
@@ -349,19 +350,19 @@ class TrucoBehaviour(CyclicBehaviour):
 
 
 # ============================================================================
-# Personalities (How the Agents Decide 4)
+# Personalities (How the Agents Decide)
 # ============================================================================
 
 
 class RationalShark(TrucoBehaviour):
     personality = config.RATIONAL_SHARK
 
-    def bias(self, player: str) -> float:
+    def bias(self, player: JID) -> float:
         if player == self.agent.partner:
             return self.personality.partner_bias
         return self.personality.opponent_bias
 
-    def trust(self, speaker: str, category: Category, source: Source) -> float:
+    def trust(self, speaker: JID, category: Category, source: Source) -> float:
         return self.personality.trust
 
     def call_bonus(self) -> float:
@@ -383,12 +384,12 @@ class MaverickBluffer(TrucoBehaviour):
     # folds every time and would give a bonus that is not skill.
     opponents_are_control: bool = False
 
-    def bias(self, player: str) -> float:
+    def bias(self, player: JID) -> float:
         if player == self.agent.partner:
             return self.personality.partner_bias
         return self.personality.opponent_bias
 
-    def trust(self, speaker: str, category: Category, source: Source) -> float:
+    def trust(self, speaker: JID, category: Category, source: Source) -> float:
         return self.personality.trust
 
     def call_bonus(self) -> float:
@@ -407,13 +408,13 @@ class MaverickBluffer(TrucoBehaviour):
 class LooseCannon(TrucoBehaviour):
     personality = config.LOOSE_CANNON
 
-    def bias(self, player: str) -> float:
+    def bias(self, player: JID) -> float:
         """About opponents: LOOSE_CANNON_BIAS_PER_ADVANTAGE × advantage."""
         if player == self.agent.partner:
             return self.personality.partner_bias
         return LOOSE_CANNON_BIAS_PER_ADVANTAGE * self.advantage()
 
-    def trust(self, speaker: str, category: Category, source: Source) -> float:
+    def trust(self, speaker: JID, category: Category, source: Source) -> float:
         return self.personality.trust
 
     def call_bonus(self) -> float:
@@ -427,12 +428,12 @@ class LooseCannon(TrucoBehaviour):
 class Grinder(TrucoBehaviour):
     personality = config.GRINDER
 
-    def bias(self, player: str) -> float:
+    def bias(self, player: JID) -> float:
         if player == self.agent.partner:
             return self.personality.partner_bias
         return self.personality.opponent_bias
 
-    def trust(self, speaker: str, category: Category, source: Source) -> float:
+    def trust(self, speaker: JID, category: Category, source: Source) -> float:
         """Partner: the normal trust. Opponent: GRINDER_THREAT_TRUST if it is a threat
         (strong announcement or call), otherwise 0."""
         if speaker == self.agent.partner:
@@ -460,21 +461,21 @@ class Player(Agent):
 
     def __init__(
         self,
-        jid: str,
+        jid: JID,
         password: str,
         team: TEAM,
-        table: str,
-        board: str,
-        partner: str,
-        opponents: list[str],
+        table: JID,
+        board: JID,
+        partner: JID,
+        opponents: list[JID],
         behaviour: TrucoBehaviour,
     ) -> None:
         """`opponents[0]` must be the one who plays right after me: he answers my calls."""
-        super().__init__(jid, password)
+        super().__init__(str(jid), password)
         self.team = team
         self.table = table
         self.board = board
-        self.me = str(self.jid.bare)
+        self.me = JID(self.jid.bare)
         self.partner = partner
         self.opponents = list(opponents)
         self.behaviour = behaviour
@@ -482,20 +483,20 @@ class Player(Agent):
         # Beliefs. Facts and raw announcements only: interpreting them (bias, trust) is
         # the behaviour's job, because it depends on the personality.
         self.hand = Hand()
-        self.played: dict[str, list[Card]] = {}  # cards each player put on the table this point
-        self.announcements: dict[str, Announcement] = {}  # the latest one about each player
+        self.played: dict[JID, list[Card]] = {}  # cards each player put on the table this point
+        self.announcements: dict[JID, Announcement] = {}  # the latest one about each player
         self.rounds: list[bool | None] = []  # this point, from my side: won, lost, None = tie
         self.score_ours = 0
         self.score_theirs = 0
         # Fold history: the only memory that survives from one point to the next
-        self.folds: Counter[str] = Counter()
-        self.calls_received: Counter[str] = Counter()
+        self.folds: Counter[JID] = Counter()
+        self.calls_received: Counter[JID] = Counter()
 
     async def setup(self) -> None:
         self.add_behaviour(self.behaviour, game_template())
 
     @property
-    def everyone(self) -> list[str]:
+    def everyone(self) -> list[JID]:
         return [self.me, self.partner, *self.opponents]
 
     def new_point(self, hand: Hand) -> None:

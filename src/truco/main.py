@@ -2,6 +2,7 @@
 
 import asyncio
 import spade
+from slixmpp import JID
 from spade.agent import Agent
 from spade.behaviour import OneShotBehaviour
 
@@ -35,9 +36,9 @@ class MyAgent(Agent):
 
 
 async def main():
-    id = f"my_agent@{XMPP_DOMAIN}"
+    id = JID(f"my_agent@{XMPP_DOMAIN}")
 
-    agent = MyAgent(id, AGENT_PASSWORD)
+    agent = MyAgent(str(id), AGENT_PASSWORD)
 
     await agent.start()
     print(f"[{id}] Agent started.")

@@ -7,11 +7,12 @@ players and calls the rules at the right time.
 import asyncio
 import random
 
+from slixmpp import JID
 from spade.agent import Agent
 from spade.behaviour import FSMBehaviour, State
 from spade.message import Message
 
-from truco.communication import create_message, game_template, read_message
+from truco.communication import create_message, game_template, read_message, sender_of
 from truco.config import (
     POINTS_TO_WIN,
     TEAM,
@@ -36,7 +37,7 @@ class TableState(State):
         for player in self.agent.players:
             await self.send(create_message(player, Performative.INFORM, content))
 
-    async def announce_call(self, caller: str, value: int) -> None:
+    async def announce_call(self, caller: JID, value: int) -> None:
         """Public notice of a call (or raise): everyone hears it, and it says who must answer."""
         table = self.agent
         table.answering = table.bet.responder(caller)
@@ -47,7 +48,7 @@ class TableState(State):
             "responder": table.answering,
         })
 
-    async def wait_for(self, player: str, event: Event) -> dict | None:
+    async def wait_for(self, player: JID, event: Event) -> dict | None:
         """Waits up to TURN_TIMEOUT for `event` from `player` and returns its data.
 
         Any other message that arrives meanwhile is ignored. None = it did not come.
@@ -58,9 +59,9 @@ class TableState(State):
             if msg is None:
                 return None
             got, data = read_message(msg)
-            if got == event and str(msg.sender.bare) == player:
+            if got == event and sender_of(msg) == player:
                 return data
-            print(f"[table] ignored {got} from {msg.sender.bare} while waiting for {event} from {player}")
+            print(f"[table] ignored {got} from {sender_of(msg)} while waiting for {event} from {player}")
         return None
 
 
@@ -136,7 +137,7 @@ class Turn(TableState):
 
         # 3. A truco call (Specification 2.4, rules 1 and 2): announce it and go to the declarations.
         event, _ = read_message(msg)
-        if event == Event.CALL and str(msg.sender.bare) == table.turn and can_call:
+        if event == Event.CALL and sender_of(msg) == table.turn and can_call:
             value = table.bet.call(table.turn)
             await self.announce_call(table.turn, value)
             self.set_next_state(TablePhase.DECLARE)
@@ -145,7 +146,7 @@ class Turn(TableState):
         # 4. Otherwise it must be a card. Invalid: ignored, the turn stays with the same player.
         card = self.valid_card(msg)
         if card is None:
-            print(f"[table] invalid play from {msg.sender.bare}: {msg.body}")
+            print(f"[table] invalid play from {sender_of(msg)}: {msg.body}")
             self.set_next_state(TablePhase.TURN)
             return
 
@@ -171,7 +172,7 @@ class Turn(TableState):
         event, data = read_message(msg)
         if event != Event.CARD_PLAYED:
             return None
-        if str(msg.sender.bare) != table.turn:  # bare: without the connection suffix (/resource)
+        if sender_of(msg) != table.turn:
             return None
         try:
             card = Card(Rank(data.get("card")))
@@ -334,27 +335,27 @@ class EndMatch(TableState):
 
 
 class TableAgent(Agent):
-    def __init__(self, jid: str, password: str, players: list[str], seed: int | None = None):
-        super().__init__(jid, password)
+    def __init__(self, jid: JID, password: str, players: list[JID], seed: int | None = None):
+        super().__init__(str(jid), password)
         # Information board: everything the table knows lives here, and the states read/write it
         self.players = players  # seat order: A, B, A, B
         self.rng = random.Random(seed)
         self.score: dict[TEAM, int] = {team: 0 for team in TEAMS}
         self.opener = players[0]  # P1 opens the first point
         self.turn = self.opener
-        self.hands: dict[str, Hand] = {}
+        self.hands: dict[JID, Hand] = {}
         self.cards_on_table: CardsOnTable = []
         self.point = Point(players)
         self.bet = Bet(players)
         self.answering = self.opener  # who must answer the current call
         self.fold_result: tuple[TEAM, int] | None = None  # set when a point ends by folding
 
-    def next_seat(self, player: str) -> str:
+    def next_seat(self, player: JID) -> JID:
         """Next seat in play order."""
         i = self.players.index(player)
         return self.players[(i + 1) % len(self.players)]
 
-    def partner_of(self, player: str) -> str:
+    def partner_of(self, player: JID) -> JID:
         """Partners sit two seats apart."""
         i = self.players.index(player)
         return self.players[(i + 2) % len(self.players)]
