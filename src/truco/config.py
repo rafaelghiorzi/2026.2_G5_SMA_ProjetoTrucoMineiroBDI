@@ -129,6 +129,16 @@ class Event(StrEnum):
     ROUND_END = "round-end"
     POINT_END = "point-end"
     MATCH_END = "match-end"
+    # table -> board asks AGREE or REFUSE; Performative: REQUEST; Payload: round, players (A,B,A,B)
+    # board -> table answer AGREE or REFUSE; Performative: REQUEST; Payload: round
+    OPEN = "open"           # table -> board: asks AGREE or REFUSE 
+    # player -> board asks AGREE or REFUSE; Performative: REQUEST; Payload: round, action, value
+    # board -> player answer AGREE or REFUSE; Performative: REQUEST; Payload: round
+    DECLARE = "declare"     # player -> board: asks AGREE or REFUSE
+    # board -> player; Performative: inform; Payload: round, { player : value } | {}
+    READING = "reading"    # board -> player: only for LISTEN and SPY
+    # board -> table: Performative: INFORM; Payload: round
+    CLOSED = "closed"  # board -> table
 
 
 class Response(StrEnum):
@@ -169,6 +179,18 @@ class TablePhase(StrEnum):
     END_ROUND = "END_ROUND"
     END_POINT = "END_POINT"
     END_MATCH = "END_MATCH"
+
+
+# ============================================================================
+# Board
+# ============================================================================
+
+class BoardPhase(StrEnum):
+    """Names of the states in the table's state machine."""
+
+    INACTIVE = "INACTIVE"
+    OPEN = "OPEN"
+    PROCESSING = "PROCESSING"
 
 
 # ============================================================================
