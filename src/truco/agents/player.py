@@ -25,6 +25,7 @@ from truco import config
 from truco.communication import create_message, game_template, read_message
 from truco.config import (
     ADVANTAGE_WEIGHT_IN_THRESHOLDS,
+    BET_LEVELS,
     BREAK_EVEN,
     CALL_ANNOUNCES,
     CARD_COEFFICIENT,
@@ -286,14 +287,15 @@ class TrucoBehaviour(CyclicBehaviour):
 
     def should_call(self) -> bool:
         """Call truco if the chance of winning the point is above the threshold (3.5)."""
-        return self.win_chance() > self.call_threshold()    
+        return self.win_chance() + self.call_bonus() > self.raise_threshold()   
 
     def answer_call(self, value_called: int) -> Response:
         """Someone called: fold, accept or raise"""
         chance = self.win_chance()
-        if chance < self.fold_threshold(value_called):
+        if chance < self.fold_threshold(value_called):   
             return Response.FOLD
-        if chance > self.raise_threshold():
+        can_raise = value_called < BET_LEVELS[-1]        
+        if can_raise and chance + self.call_bonus() > self.raise_threshold():
             return Response.RAISE
         return Response.ACCEPT
 
@@ -322,12 +324,11 @@ class TrucoBehaviour(CyclicBehaviour):
 
     def talk(self) -> TalkAction:
         """Draw from the personality's talk table after the common-sense rules (3.7)."""
-        # TODO:
         # - with a strong hand, the weight of BLUFF moves to SEND;
         # - whoever already sent this point, or has no cards, cannot SEND;
         # - whoever has no cards cannot BLUFF;
         # - draw among what is left in proportion to self.personality.talk.
-        raise NotImplementedError
+        
 
     # --- What changes with the personality ---
     # CyclicBehaviour already uses ABCMeta, so @abstractmethod is enforced here.
