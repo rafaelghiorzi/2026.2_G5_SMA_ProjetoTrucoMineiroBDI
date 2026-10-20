@@ -11,6 +11,7 @@ everyone. The rules that change from one personality to another are abstract
 methods, implemented by the four personalities at the end of this file.
 """
 
+import random
 from abc import abstractmethod
 from collections import Counter
 from collections.abc import Awaitable, Callable
@@ -87,6 +88,11 @@ class TrucoBehaviour(CyclicBehaviour):
 
     agent: "Player"
     personality: Personality  # each personality defines it
+
+    def __init__(self, rng: random.Random | None = None) -> None:
+        """`rng` lets the simulations fix a seed; without it, a fresh generator is used."""
+        super().__init__()
+        self.rng = rng or random.Random()
 
     async def run(self) -> None:
         # In SPADE, receive() without a timeout returns at once; with one, it waits for a message
@@ -205,6 +211,7 @@ class TrucoBehaviour(CyclicBehaviour):
         #    The table does not send the round number in TALK_WINDOW yet.
         # 4. LISTEN and SPY get the answer later, in on_reading. A REJECT from the board
         #    must be treated as NOTHING.
+        # 5. If the action is SEND (and the board accepted): self.agent.sent_this_point = True
         raise NotImplementedError
 
     # --- Shared recipe (How the Agents Decide 3.2–3.5, summary in Appendix A) ---
@@ -299,31 +306,72 @@ class TrucoBehaviour(CyclicBehaviour):
             return Response.RAISE
         return Response.ACCEPT
 
+    def current_round_cards(self) -> dict[JID, Card]:
+        """Cards of the current round: whoever played more cards than the rounds already finished.
+
+        `rounds` gets one item per ROUND_END (ties included), so its length is the index of
+        the current round inside each list of `played`."""
+        finished = len(self.agent.rounds)
+        return {
+            player: cards[finished]
+            for player, cards in self.agent.played.items()
+            if len(cards) > finished
+        }
+
     def choose_card(self) -> Card:
         """Which card to play (Specification 4.5; How the Agents Decide 3.6)."""
-        if len(self.agent.hand) == 1:
-            return self.agent.hand.cards[0]
-        # TODO:
-        # 1. Last card: no decision, play it.
-        # 2. Answering (someone already played this round), same rule for everyone:
-        #    - the highest card on the table is my partner's (and no opponent card ties it):
-        #      play the weakest;
-        #    - otherwise the weakest that still beats it (Hand.weakest_that_beats);
-        #    - if none beats it, the weakest.
-        #    The cards of the current round are the last ones in self.agent.played of each player.
-        # 3. Opening the round: self.open_round() (the personality decides).
-        raise NotImplementedError
+        hand = self.agent.hand
+        # last card available
+        if len(hand) == 1:
+            return hand.cards[0]
+
+        # if no cards on the table, open the round with the personality's opening table 
+        on_table = self.current_round_cards()
+        if not on_table:
+            return self.open_round()
+
+        # if my partner is winning, play the weakest card 
+        highest = max(on_table.values(), key=lambda card: card.position)
+        best_opponent = max(
+            (card.position for player, card in on_table.items() if player in self.agent.opponents),
+            default=0,
+        )
+        partner_card = on_table.get(self.agent.partner)
+        if partner_card is not None and partner_card.position > best_opponent:
+            return hand.weakest()  # my partner is already winning (a tie is not winning)
+        return hand.weakest_that_beats(highest) or hand.weakest()
 
     def declare(self) -> Category:
         return category_of(self.hand_strength())
 
     def talk(self) -> TalkAction:
         """Draw from the personality's talk table after the common-sense rules (3.7)."""
-        # - with a strong hand, the weight of BLUFF moves to SEND;
-        # - whoever already sent this point, or has no cards, cannot SEND;
-        # - whoever has no cards cannot BLUFF;
-        # - draw among what is left in proportion to self.personality.talk.
-        
+        weights = dict(self.personality.talk)  # a copy: the personality's table is shared
+        has_cards = len(self.agent.hand) > 0
+
+        # With a strong hand, the weight of BLUFF moves to SEND (bluffing only makes sense without a hand)
+        if has_cards and self.agent.hand.category == Category.STRONG:
+            weights[TalkAction.SEND] += weights.pop(TalkAction.BLUFF)
+        # Whoever already sent this point, or has no cards, cannot SEND
+        if self.agent.sent_this_point or not has_cards:
+            weights.pop(TalkAction.SEND, None)
+        # Whoever has no cards cannot BLUFF either
+        if not has_cards:
+            weights.pop(TalkAction.BLUFF, None)
+
+        actions = list(weights)
+        return self.rng.choices(actions, weights=[weights[action] for action in actions])[0]
+
+    def draw_opening(self) -> Card:
+        """Draw with the personality's opening table (3.6). With 2 cards there is no "medium"."""
+        cards = sorted(self.agent.hand, key=lambda card: card.position)  # weak -> strong
+        if len(cards) == 3:
+            w = self.personality.opening_3
+            options, weights = [cards[2], cards[1], cards[0]], [w.strong, w.medium, w.weak]
+        else:
+            w = self.personality.opening_2
+            options, weights = [cards[-1], cards[0]], [w.strong, w.weak]
+        return self.rng.choices(options, weights=weights)[0]
 
     # --- What changes with the personality ---
     # CyclicBehaviour already uses ABCMeta, so @abstractmethod is enforced here.
@@ -400,8 +448,7 @@ class MaverickBluffer(TrucoBehaviour):
         return FOLD_BONUS_WEIGHT * fold_rate
 
     def open_round(self) -> Card:
-        # TODO: draw with personality.opening_3 (3 cards) or opening_2 (2 cards)
-        raise NotImplementedError
+        return self.draw_opening()
 
 
 class LooseCannon(TrucoBehaviour):
@@ -420,8 +467,7 @@ class LooseCannon(TrucoBehaviour):
         return 0.0
 
     def open_round(self) -> Card:
-        # TODO: draw with personality.opening_3 (3 cards) or opening_2 (2 cards)
-        raise NotImplementedError
+        return self.draw_opening()
 
 
 class Grinder(TrucoBehaviour):
@@ -445,8 +491,7 @@ class Grinder(TrucoBehaviour):
         return 0.0
 
     def open_round(self) -> Card:
-        # TODO: draw with personality.opening_3 (3 cards) or opening_2 (2 cards)
-        raise NotImplementedError
+        return self.draw_opening()
 
 
 # ============================================================================
@@ -485,6 +530,7 @@ class Player(Agent):
         self.played: dict[JID, list[Card]] = {}  # cards each player put on the table this point
         self.announcements: dict[JID, Announcement] = {}  # the latest one about each player
         self.rounds: list[bool | None] = []  # this point, from my side: won, lost, None = tie
+        self.sent_this_point = False  # SEND is allowed once per point (3.7)
         self.score_ours = 0
         self.score_theirs = 0
         # Fold history: the only memory that survives from one point to the next
@@ -504,6 +550,7 @@ class Player(Agent):
         self.played = {player: [] for player in self.everyone}
         self.announcements = {}
         self.rounds = []
+        self.sent_this_point = False
 
     def record_score(self, score: dict[TEAM, int]) -> None:
         self.score_ours = score[self.team]
