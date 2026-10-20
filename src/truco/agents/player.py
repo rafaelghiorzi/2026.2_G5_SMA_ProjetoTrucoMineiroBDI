@@ -53,7 +53,7 @@ from truco.config import (
     Source,
     TalkAction,
 )
-from truco.game import Card, Deck, Hand
+from truco.game import Card, Deck, Hand, category_of
 
 # The 29 cards, counted by rank (there are 4 queens, 2 jokers...)
 FULL_DECK: Counter[Card] = Counter(Deck().cards)
@@ -315,12 +315,7 @@ class TrucoBehaviour(CyclicBehaviour):
         raise NotImplementedError
 
     def declare(self) -> Category:
-        probability = self.win_chance()
-        if probability < 0.33:
-            return Category.WEAK
-        if probability < 0.66:
-            return Category.MEDIUM
-        return Category.STRONG
+        return category_of(self.hand_strength())
 
     def talk(self) -> TalkAction:
         """Draw from the personality's talk table after the common-sense rules (3.7)."""
