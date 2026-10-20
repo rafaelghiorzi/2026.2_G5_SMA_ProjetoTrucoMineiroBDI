@@ -299,18 +299,26 @@ class TrucoBehaviour(CyclicBehaviour):
 
     def choose_card(self) -> Card:
         """Which card to play (Specification 4.5; How the Agents Decide 3.6)."""
+        if len(self.agent.hand) == 1:
+            return self.agent.hand.cards[0]
         # TODO:
         # 1. Last card: no decision, play it.
         # 2. Answering (someone already played this round), same rule for everyone:
         #    - the highest card on the table is my partner's (and no opponent card ties it):
         #      play the weakest;
         #    - otherwise the weakest that still beats it (Hand.weakest_that_beats);
+        #    - if none beats it, the weakest.
+        #    The cards of the current round are the last ones in self.agent.played of each player.
+        # 3. Opening the round: self.open_round() (the personality decides).
         raise NotImplementedError
 
-    def declare(self) -> Category | None:
-        """Public declaration before answering a call: always the true category (6.3)."""
-        # TODO: category of hand_strength() (truco.game.category_of covers the empty hand)
-        raise NotImplementedError
+    def declare(self) -> Category:
+        probability = self.win_chance()
+        if probability < 0.33:
+            return Category.WEAK
+        if probability < 0.66:
+            return Category.MEDIUM
+        return Category.STRONG
 
     def talk(self) -> TalkAction:
         """Draw from the personality's talk table after the common-sense rules (3.7)."""
