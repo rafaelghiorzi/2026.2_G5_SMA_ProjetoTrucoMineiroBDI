@@ -16,7 +16,7 @@ class Coward(Player):
         return Response.FOLD
 
     def choose_card(self) -> Card:
-        raise NotImplementedError  # self.hand.weakest()
+        return self.hand.weakest()
 
 
 class Madman(Player):
