@@ -7,7 +7,7 @@ from slixmpp import JID
 from truco.config import AGENT_PASSWORD, XMPP_DOMAIN
 
 from truco.agents.table import TableAgent
-from truco.agents.blackboard import BlackBoardAgent
+from truco.agents.blackboard import BlackboardAgent
 from truco.agents.player import Player, LooseCannon, MaverickBluffer, Grinder, RationalShark
 
 SEATS = ["A1", "B1", "A2", "B2"]
@@ -30,7 +30,7 @@ async def main():
             [players[(i + 1) % 4], players[(i + 3) % 4]],  # quem joga logo depois vem primeiro
             random.choice(personalities)(),
         ))
-    board = BlackBoardAgent(board_jid, AGENT_PASSWORD, table_jid, players, 1)
+    board = BlackboardAgent(board_jid, AGENT_PASSWORD, table_jid)
     table = TableAgent(table_jid, AGENT_PASSWORD, board_jid, players, 67)
 
 
