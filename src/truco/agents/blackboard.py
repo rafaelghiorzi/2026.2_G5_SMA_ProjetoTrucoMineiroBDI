@@ -53,7 +53,7 @@ class Inactive(BoardState):
 class Open(BoardState):
     """Coleta as declarações dos jogadores até todos responderem ou expirar o prazo."""
 
-    class Content(TypedDict):
+    class Content(TypedDict):   
         action: TalkAction
         value: float | None
 

@@ -70,7 +70,7 @@ class StartPoint(TableState):
     """Starts a point: new cards, bet worth 1, and each player receives their hand."""
 
     async def run(self) -> None:
-        table = self.agent  # the board: everything the states read and write lives on the agent
+        table = self.agent 
 
         # 1. New deck for every point: the 29 cards come back and are shuffled.
         deck = Deck(table.rng)
@@ -84,8 +84,7 @@ class StartPoint(TableState):
         table.cards_on_table = []
         table.fold_result = None
 
-        # 3. Each player receives ONLY their own cards. This is what guarantees the
-        #    partial view (Specification 3): the others' hands never reach them.
+        # 3. Each player receives ONLY their own cards.
         for player, hand in table.hands.items():
             content = {
                 "event": Event.NEW_POINT,
@@ -102,10 +101,8 @@ class StartPoint(TableState):
 
 
 class PlayerTalk(TableState):
-    """The talk window of the point: one per point, after the deal and before the first card.
-
-    The board is opened first and the players are told only after it accepts, so a
-    quick declaration never finds it inactive (docs/arquitetura_blackboard_truco.pdf, 6).
+    """
+    The talk window of the point: one per point, after the deal and before the first card.
     """
 
     async def run(self) -> None:
