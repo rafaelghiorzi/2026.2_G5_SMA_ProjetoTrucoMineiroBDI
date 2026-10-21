@@ -12,7 +12,7 @@ from spade.agent import Agent
 from spade.behaviour import FSMBehaviour, State
 from spade.message import Message
 
-from truco.agents.blackboard import BlackBoardAgent
+from truco.agents.blackboard import BlackboardAgent
 from truco.communication import create_message, game_template, read_message, sender_of
 from truco.config import (
     POINTS_TO_WIN,

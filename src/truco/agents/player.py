@@ -118,7 +118,7 @@ class TrucoBehaviour(CyclicBehaviour):
     async def tell(self, recipient: JID, performative: Performative, content: dict) -> None:
         await self.send(create_message(recipient, performative, content))
 
-    # --- Notices: they only update the beliefs (Specification 4.1) ---
+    # --- Notices: they only update the beliefs ---
 
     async def on_new_point(self, data: dict) -> None:
         self.agent.point_number = data["point"]
@@ -134,7 +134,7 @@ class TrucoBehaviour(CyclicBehaviour):
             self.agent.hand.remove(card)
 
     async def on_call(self, data: dict) -> None:
-        """Calling truco counts as announcing a medium hand (Specification 6.4)."""
+        """Calling truco counts as announcing a medium hand"""
         self.agent.announcements[JID(data["player"])] = Announcement(CALL_ANNOUNCES, Source.CALL)
 
     async def on_declaration(self, data: dict) -> None:
@@ -160,11 +160,12 @@ class TrucoBehaviour(CyclicBehaviour):
         await self.agent.stop()
 
     async def on_reading(self, data: dict) -> None:
-        """Answer from the board to a LISTEN or SPY (docs/arquitetura_blackboard_truco.pdf)."""
-        # TODO: turn what was read into announcements (Source.PARTNER_SIGNAL or Source.SPIED_SIGNAL).
-        # - A partner signal heard without having chosen LISTEN gets attentive=False (×0.7, 3.7).
-        # - Open with the board team: it sends {player: value}, but the documents talk about
-        #   categories (weak/medium/strong). Agree on what travels.
+        """Signals the board delivered: {"point", "signals": [{"from": jid, "value": category}]}."""
+        # TODO: turn each signal into an announcement about signal["from"] (Specification 6.2).
+        # - From my partner: Source.PARTNER_SIGNAL. It always arrives; attentive=False if my
+        #   action this point was not LISTEN (×0.7, 3.7).
+        # - From an opponent (only when my SPY succeeded): Source.SPIED_SIGNAL. It may be a bluff.
+        # - Ignore it if data["point"] is not the current point (a late message).
         raise NotImplementedError
 
     # --- Requests: decide and answer (Specification 4.4) ---
@@ -198,13 +199,14 @@ class TrucoBehaviour(CyclicBehaviour):
     async def on_talk_window(self, data: dict) -> None:
         """One talk action per round, declared to the board (Specification 6.2)."""
         # TODO:
-        # 1. action = self.talk()
+        # 1. action = self.talk(), and remember it: on_reading needs to know if it was LISTEN.
+        #    SPY: draw self.personality.spy_success first; if it fails, declare NOTHING.
         # 2. value: SEND -> my true category; BLUFF -> Category.STRONG; others -> None.
         # 3. await self.tell(self.agent.board, Performative.REQUEST,
         #        {"event": Event.DECLARE, "point": self.agent.point_number,
         #         "action": action, "value": value})
-        # 4. LISTEN and SPY get the answer later, in on_reading. A REJECT from the board
-        #    must be treated as NOTHING.
+        # 4. The signals arrive later, in on_reading. A REJECT from the board must be
+        #    treated as NOTHING.
         raise NotImplementedError
 
     # --- Shared recipe (How the Agents Decide 3.2–3.5, summary in Appendix A) ---

@@ -139,6 +139,7 @@ class Event(StrEnum):
     READING = "reading"    # board -> player: only for LISTEN and SPY
     # board -> table: Performative: INFORM; Payload: point
     CLOSED = "closed"  # board -> table
+    QUERY = "query"
 
 
 class Response(StrEnum):
