@@ -1,60 +1,46 @@
-"""Entry point. For now it only runs a one-shot test agent."""
+"""Entry point. Initiates a game!"""
 
-import asyncio
+
 import spade
+import random
 from slixmpp import JID
-from spade.agent import Agent
-from spade.behaviour import OneShotBehaviour
-
 from truco.config import AGENT_PASSWORD, XMPP_DOMAIN
 
+from truco.agents.table import TableAgent
+from truco.agents.blackboard import BlackboardAgent
+from truco.agents.player import Player, LooseCannon, MaverickBluffer, Grinder, RationalShark
 
-class MyBehaviour(OneShotBehaviour):
-    agent: Agent
-
-
-    async def on_start(self) -> None:
-        print("Starting one-shot test behaviour.")
-
-    async def run(self) -> None:
-        print("One-shot test behaviour running.")
-        await asyncio.sleep(1)
-        print("One-shot test behaviour finished.")
-
-    async def on_end(self) -> None:
-        print("One-shot test behaviour ended.")
-        await self.agent.stop()
-
-
-
-class MyAgent(Agent):
-    async def setup(self) -> None:
-        print(f"[{self.jid}] Setting up agent.")
-
-        self.behaviour = MyBehaviour()
-        self.add_behaviour(self.behaviour)
-
+SEATS = ["A1", "B1", "A2", "B2"]
 
 async def main():
-    id = JID(f"my_agent@{XMPP_DOMAIN}")
+    players = [JID(f"player_{seat}@{XMPP_DOMAIN}") for seat in SEATS]
+    table_jid = JID(f"table@{XMPP_DOMAIN}")
+    board_jid = JID(f"board@{XMPP_DOMAIN}")
+    personalities = [Grinder, MaverickBluffer, LooseCannon, RationalShark]
 
-    agent = MyAgent(str(id), AGENT_PASSWORD)
+    agents: list[Player] = []
+    for i, jid in enumerate(players):
+        agents.append(Player(
+            jid,
+            AGENT_PASSWORD,
+            "A" if i % 2 == 0 else "B",
+            table_jid,
+            board_jid,
+            players[(i + 2) % 4],                          # parceiro
+            [players[(i + 1) % 4], players[(i + 3) % 4]],  # quem joga logo depois vem primeiro
+            random.choice(personalities)(),
+        ))
+    board = BlackboardAgent(board_jid, AGENT_PASSWORD, table_jid)
+    table = TableAgent(table_jid, AGENT_PASSWORD, board_jid, players, 67)
 
-    await agent.start()
-    print(f"[{id}] Agent started.")
 
-    while agent.is_alive():
-        try:
-            await asyncio.sleep(1)
-        except KeyboardInterrupt:
-            print("Interrupted by the user.")
-            break
+    for player in agents:
+        await player.start()
+    await board.start()
+    await table.start()
 
-    assert agent.behaviour.exit_code == 10
-    await agent.stop()
-
-    print(f"[{id}] Agent stopped.")
-
+    await spade.wait_until_finished([table, *agents])
+    await board.stop()
 
 def run() -> None:
     spade.run(main(), embedded_xmpp_server=True)

@@ -12,6 +12,7 @@ from spade.agent import Agent
 from spade.behaviour import FSMBehaviour, State
 from spade.message import Message
 
+from truco.agents.blackboard import BlackboardAgent
 from truco.communication import create_message, game_template, read_message, sender_of
 from truco.config import (
     POINTS_TO_WIN,
@@ -69,7 +70,7 @@ class StartPoint(TableState):
     """Starts a point: new cards, bet worth 1, and each player receives their hand."""
 
     async def run(self) -> None:
-        table = self.agent  # the board: everything the states read and write lives on the agent
+        table = self.agent 
 
         # 1. New deck for every point: the 29 cards come back and are shuffled.
         deck = Deck(table.rng)
@@ -77,16 +78,17 @@ class StartPoint(TableState):
         table.hands = deck.deal(table.players)
 
         # 2. New Point and Bet: no round played, point worth 1.
+        table.point_number += 1
         table.point = Point(table.players)
         table.bet = Bet(table.players)
         table.cards_on_table = []
         table.fold_result = None
 
-        # 3. Each player receives ONLY their own cards. This is what guarantees the
-        #    partial view (Specification 3): the others' hands never reach them.
+        # 3. Each player receives ONLY their own cards.
         for player, hand in table.hands.items():
             content = {
                 "event": Event.NEW_POINT,
+                "point": table.point_number,
                 "cards": [card.rank for card in hand],  # a Card isn't JSON; its rank is
                 "opener": table.opener,
                 "score": table.score,
@@ -99,17 +101,49 @@ class StartPoint(TableState):
 
 
 class PlayerTalk(TableState):
+    """
+    The talk window of the point: one per point, after the deal and before the first card.
+    """
+
     async def run(self) -> None:
         table = self.agent
-        # TODO
-        # liberar os quatro agentes para conversarem pelo blackboard
+
+        # 1. Open the board for this point. The number lets it refuse late declarations.
+        await self.send(create_message(
+            recipient=table.board,
+            performative=Performative.REQUEST,
+            content={
+                "event": Event.OPEN,
+                "point": table.point_number,
+                "players": table.players,
+            }))
+
+        msg = await self.receive(timeout=30)
+        if msg is None:
+            self.set_next_state(TablePhase.PLAYER_TALK)
+            return
+
+        performative = msg.get_metadata("performative")
+        event, data = read_message(msg)
+        if event != Event.OPEN or performative != Performative.ACCEPT:
+            self.set_next_state(TablePhase.PLAYER_TALK)
+            return
+
+        # 2. Only now the four players are released to talk through the board
         await self.notify_all({
-            "event": Event.TALK_WINDOW
+            "event": Event.TALK_WINDOW,
+            "point": table.point_number,
         })
 
         # esperar que a comunicação se encerre 
-        self.set_next_state(TablePhase.START_POINT)
-    pass
+        while True:
+            message = await self.receive(timeout=60)
+            if message is None: continue
+            event, _ = read_message(message)
+            if event == Event.CLOSED: break
+
+        self.set_next_state(TablePhase.TURN)
+        return
 
 
 class Turn(TableState):
@@ -335,13 +369,15 @@ class EndMatch(TableState):
 
 
 class TableAgent(Agent):
-    def __init__(self, jid: JID, password: str, players: list[JID], seed: int | None = None):
+    def __init__(self, jid: JID, password: str, board: JID, players: list[JID], seed: int | None = None):
         super().__init__(str(jid), password)
         # Information board: everything the table knows lives here, and the states read/write it
+        self.board = board
         self.players = players  # seat order: A, B, A, B
         self.rng = random.Random(seed)
         self.score: dict[TEAM, int] = {team: 0 for team in TEAMS}
         self.opener = players[0]  # P1 opens the first point
+        self.point_number = 0  # points played so far; identifies the point in messages
         self.turn = self.opener
         self.hands: dict[JID, Hand] = {}
         self.cards_on_table: CardsOnTable = []
@@ -362,6 +398,7 @@ class TableAgent(Agent):
 
     async def setup(self) -> None:
         flow = FSMBehaviour()
+        # States
         flow.add_state(TablePhase.START_POINT, StartPoint(), initial=True)
         flow.add_state(TablePhase.PLAYER_TALK, PlayerTalk())
         flow.add_state(TablePhase.TURN, Turn())
@@ -371,8 +408,10 @@ class TableAgent(Agent):
         flow.add_state(TablePhase.END_POINT, EndPoint())
         flow.add_state(TablePhase.END_MATCH, EndMatch())
 
-        flow.add_transition(TablePhase.START_POINT, TablePhase.TURN)
-        # flow.add_transition(TablePhase.PLAYER_TALK, TablePhase.TURN)
+        # Possoble transitions between states
+        flow.add_transition(TablePhase.START_POINT, TablePhase.PLAYER_TALK)
+        flow.add_transition(TablePhase.PLAYER_TALK, TablePhase.PLAYER_TALK)
+        flow.add_transition(TablePhase.PLAYER_TALK, TablePhase.TURN)
         flow.add_transition(TablePhase.TURN, TablePhase.TURN)
         flow.add_transition(TablePhase.TURN, TablePhase.END_ROUND)
         flow.add_transition(TablePhase.TURN, TablePhase.DECLARE)
