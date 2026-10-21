@@ -121,6 +121,7 @@ class TrucoBehaviour(CyclicBehaviour):
     # --- Notices: they only update the beliefs (Specification 4.1) ---
 
     async def on_new_point(self, data: dict) -> None:
+        self.agent.point_number = data["point"]
         self.agent.new_point(Hand([Card(Rank(rank)) for rank in data["cards"]]))
         self.agent.record_score(data["score"])
 
@@ -200,8 +201,8 @@ class TrucoBehaviour(CyclicBehaviour):
         # 1. action = self.talk()
         # 2. value: SEND -> my true category; BLUFF -> Category.STRONG; others -> None.
         # 3. await self.tell(self.agent.board, Performative.REQUEST,
-        #        {"event": Event.DECLARE, "round": ..., "action": action, "value": value})
-        #    The table does not send the round number in TALK_WINDOW yet.
+        #        {"event": Event.DECLARE, "point": self.agent.point_number,
+        #         "action": action, "value": value})
         # 4. LISTEN and SPY get the answer later, in on_reading. A REJECT from the board
         #    must be treated as NOTHING.
         raise NotImplementedError
@@ -475,6 +476,7 @@ class Player(Agent):
         self.team = team
         self.table = table
         self.board = board
+        self.point_number = 0  # which point is being played, as told by the table
         self.me = JID(self.jid.bare)
         self.partner = partner
         self.opponents = list(opponents)

@@ -129,15 +129,15 @@ class Event(StrEnum):
     ROUND_END = "round-end"
     POINT_END = "point-end"
     MATCH_END = "match-end"
-    # table -> board asks AGREE or REFUSE; Performative: REQUEST; Payload: round, players (A,B,A,B)
-    # board -> table answer AGREE or REFUSE; Performative: REQUEST; Payload: round
+    # table -> board asks AGREE or REFUSE; Performative: REQUEST; Payload: point, players (A,B,A,B)
+    # board -> table answer AGREE or REFUSE; Performative: REQUEST; Payload: point
     OPEN = "open"           # table -> board: asks AGREE or REFUSE 
-    # player -> board asks AGREE or REFUSE; Performative: REQUEST; Payload: round, action, value
-    # board -> player answer AGREE or REFUSE; Performative: REQUEST; Payload: round
+    # player -> board asks AGREE or REFUSE; Performative: REQUEST; Payload: point, action, value
+    # board -> player answer AGREE or REFUSE; Performative: REQUEST; Payload: point
     DECLARE = "declare"     # player -> board: asks AGREE or REFUSE
-    # board -> player; Performative: inform; Payload: round, { player : value } | {}
+    # board -> player; Performative: inform; Payload: point, { player : value } | {}
     READING = "reading"    # board -> player: only for LISTEN and SPY
-    # board -> table: Performative: INFORM; Payload: round
+    # board -> table: Performative: INFORM; Payload: point
     CLOSED = "closed"  # board -> table
 
 

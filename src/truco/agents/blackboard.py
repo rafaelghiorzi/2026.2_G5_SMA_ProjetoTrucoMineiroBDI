@@ -24,12 +24,12 @@ class BoardState(State):
     pass
 
 class Inactive(BoardState):
-    """Aguarda uma solicitação válida para abrir uma rodada."""
+    """Aguarda uma solicitação válida para abrir a conversa de um ponto."""
 
     class OpenPayload(TypedDict):
-            """Dados enviados no payload para abrir uma rodada: número e ordem dos jogadores."""
+            """Dados enviados no payload para abrir a conversa: número do ponto e ordem dos jogadores."""
     
-            round: int
+            point: int
             players: list[str]  # JIDs as text, as they travel in the message
 
     async def run(self) -> None:
@@ -42,13 +42,13 @@ class Inactive(BoardState):
             if got != Event.OPEN or msg.get_metadata("performative") != Performative.REQUEST: continue
         
             try:
-                self.agent.round = int(data.pop("round"))
+                self.agent.point = int(data.pop("point"))
                 self.agent.players = [JID(player) for player in data.pop("players")]
                 await self.send(create_message(self.agent.table, Performative.ACCEPT, {"event": Event.OPEN}))
                 self.set_next_state(BoardPhase.OPEN)
+                return  # the FSM only changes state when run() returns
             except:
                 await self.send(create_message(self.agent.table, Performative.REJECT, {"event": Event.OPEN}))
-
 
 class Open(BoardState):
     """Coleta as declarações dos jogadores até todos responderem ou expirar o prazo."""
@@ -59,7 +59,7 @@ class Open(BoardState):
 
     class InputPayload(TypedDict):
         """Declaração enviada por um jogador durante a janela de conversa."""
-        round: int
+        point: int
         action: TalkAction
         value: Open.Content # Category.WEAK / MEDIUM / STRONG
 
@@ -98,18 +98,18 @@ class Open(BoardState):
 
             sender, body = validated
             try:
-                received_round = int(body["round"])
+                received_point = int(body["point"])
                 action = TalkAction(body["action"])
             except (KeyError, TypeError, ValueError):
                 await self.send(create_message(sender, Performative.REJECT, {"event": Event.DECLARE,}))
                 continue
 
-            if received_round != self.agent.round:
+            if received_point != self.agent.point:
                 await self.send(create_message(sender, Performative.REJECT, {"event": Event.DECLARE,}))
                 continue
 
             self.agent.board.write(
-                self.agent.round,
+                self.agent.point,
                 sender,
                 {**body, "action": action.value},
             )
@@ -118,20 +118,19 @@ class Open(BoardState):
         missing_players = expected_players - received_players
         for player in missing_players:
             self.agent.board.write(
-                self.agent.round,
+                self.agent.point,
                 player,
                 {"value": None, "action": TalkAction.NOTHING},
             )
 
         self.set_next_state(BoardPhase.PROCESSING)
 
-
 class Processing(BoardState):
     """Processa as declarações coletadas e prepara as informações a serem divulgadas."""
 
 
     class OutputToPlayerPayload(TypedDict):
-        round: int
+        point: int
         action: TalkAction
         value: dict[str, str | Category | None]  # key: player JID as text
 
@@ -150,20 +149,20 @@ class Processing(BoardState):
     async def run(self):
         for player in self.agent.players:
             teammate, opponents = self.get_teams_info(player)
-            declaration = self.agent.board.read(self.agent.round, player)
+            declaration = self.agent.board.read(self.agent.point, player)
             if declaration is None:
                 continue
             match declaration.get("action"):
                 case TalkAction.SPY:
-                    first_opponent = self.agent.board.read(self.agent.round, opponents[0])
-                    second_opponent = self.agent.board.read(self.agent.round, opponents[1])
+                    first_opponent = self.agent.board.read(self.agent.point, opponents[0])
+                    second_opponent = self.agent.board.read(self.agent.point, opponents[1])
 
                     if first_opponent["action"] == TalkAction.SEND:
                         await self.send(create_message(
                             recipient=player,
                             performative=Performative.INFORM,
                             content={
-                                "round": self.agent.round,
+                                "point": self.agent.point,
                                 "value": first_opponent.get("value")
                             }
                         ))
@@ -174,7 +173,7 @@ class Processing(BoardState):
                             recipient=player,
                             performative=Performative.INFORM,
                             content={
-                                "round": self.agent.round,
+                                "point": self.agent.point,
                                 "value": second_opponent.get("value")
                             }
                         ))
@@ -184,19 +183,19 @@ class Processing(BoardState):
                         recipient=player,
                         performative=Performative.INFORM,
                         content={
-                            "round": self.agent.round,
+                            "point": self.agent.point,
                             "value": None
                         }
                     ))
                     continue
 
                 case TalkAction.LISTEN:
-                    mate = self.agent.board.read(round=self.agent.round, player=teammate)
+                    mate = self.agent.board.read(point=self.agent.point, player=teammate)
                     await self.send(create_message(
                         recipient=player,
                         performative=Performative.INFORM,
                         content={
-                            "round": self.agent.round,
+                            "point": self.agent.point,
                             "value": mate.get("value") if mate["action"] == TalkAction.SEND else None
                         }
                     ))
@@ -215,37 +214,36 @@ class Processing(BoardState):
         self.set_next_state(BoardPhase.INACTIVE)
         await self.send(create_message(self.agent.table, Performative.INFORM, {"event": Event.CLOSED}))
 
-
 class Board:
-    """Armazena e recupera dados por rodada e por jogador."""
+    """Armazena e recupera dados por ponto e por jogador."""
 
     def __init__(self) -> None:
         self.data = {}
 
     def write(
         self,
-        round: int,
+        point: int,
         player: JID,
         content: dict[str, object],
     ) -> None:
-        """Grava ou substitui os dados de um jogador na rodada."""
-        self.data.setdefault(round, {})[player] = dict(content)
+        """Grava ou substitui os dados de um jogador no ponto."""
+        self.data.setdefault(point, {})[player] = dict(content)
 
-    def read(self, round: int, player: JID) -> dict[str, object]:
+    def read(self, point: int, player: JID) -> dict[str, object]:
         """Recupera os dados indexados por jogador"""
-        round_messages = self.data[round]
-        player_message = round_messages[player]
+        point_messages = self.data[point]
+        player_message = point_messages[player]
         return player_message
 
 
 class BlackBoardAgent(Agent):
     """Agente que mantém os dados do Blackboard e executa seu FSM de estados."""
 
-    def __init__(self, jid: JID, password: str, table: JID, players: list[JID], round: int):
+    def __init__(self, jid: JID, password: str, table: JID, players: list[JID], point: int):
         super().__init__(str(jid), password)
         self.table = table
         self.players = players
-        self.round = round
+        self.point = point
         self.board = Board()
 
     async def setup(self) -> None:

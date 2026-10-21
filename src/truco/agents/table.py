@@ -78,6 +78,7 @@ class StartPoint(TableState):
         table.hands = deck.deal(table.players)
 
         # 2. New Point and Bet: no round played, point worth 1.
+        table.point_number += 1
         table.point = Point(table.players)
         table.bet = Bet(table.players)
         table.cards_on_table = []
@@ -88,6 +89,7 @@ class StartPoint(TableState):
         for player, hand in table.hands.items():
             content = {
                 "event": Event.NEW_POINT,
+                "point": table.point_number,
                 "cards": [card.rank for card in hand],  # a Card isn't JSON; its rank is
                 "opener": table.opener,
                 "score": table.score,
@@ -100,15 +102,25 @@ class StartPoint(TableState):
 
 
 class PlayerTalk(TableState):
+    """The talk window of the point: one per point, after the deal and before the first card.
+
+    The board is opened first and the players are told only after it accepts, so a
+    quick declaration never finds it inactive (docs/arquitetura_blackboard_truco.pdf, 6).
+    """
+
     async def run(self) -> None:
         table = self.agent
 
+        # 1. Open the board for this point. The number lets it refuse late declarations.
         await self.send(create_message(
-            recipient=self.agent.board, 
-            performative=Performative.REQUEST, 
-            content= {
-                "action": Event.OPEN
+            recipient=table.board,
+            performative=Performative.REQUEST,
+            content={
+                "event": Event.OPEN,
+                "point": table.point_number,
+                "players": table.players,
             }))
+
         msg = await self.receive(timeout=30)
         if msg is None:
             self.set_next_state(TablePhase.PLAYER_TALK)
@@ -120,9 +132,10 @@ class PlayerTalk(TableState):
             self.set_next_state(TablePhase.PLAYER_TALK)
             return
 
-        # liberar os quatro agentes para conversarem pelo blackboard
+        # 2. Only now the four players are released to talk through the board
         await self.notify_all({
-            "event": Event.TALK_WINDOW, 
+            "event": Event.TALK_WINDOW,
+            "point": table.point_number,
         })
 
         # esperar que a comunicação se encerre 
@@ -367,6 +380,7 @@ class TableAgent(Agent):
         self.rng = random.Random(seed)
         self.score: dict[TEAM, int] = {team: 0 for team in TEAMS}
         self.opener = players[0]  # P1 opens the first point
+        self.point_number = 0  # points played so far; identifies the point in messages
         self.turn = self.opener
         self.hands: dict[JID, Hand] = {}
         self.cards_on_table: CardsOnTable = []

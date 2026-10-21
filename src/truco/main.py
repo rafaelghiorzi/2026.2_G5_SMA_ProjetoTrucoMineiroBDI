@@ -31,7 +31,7 @@ async def main():
             random.choice(personalities)(),
         ))
     board = BlackBoardAgent(board_jid, AGENT_PASSWORD, table_jid, players, 1)
-    table = TableAgent(table_jid, AGENT_PASSWORD, players, 67)
+    table = TableAgent(table_jid, AGENT_PASSWORD, board_jid, players, 67)
 
 
     for player in agents:
