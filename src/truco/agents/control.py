@@ -16,15 +16,17 @@ class Coward(Player):
         return Response.FOLD
 
     def choose_card(self) -> Card:
-        raise NotImplementedError  # self.hand.weakest()
+        return self.hand.weakest()
 
 
 class Madman(Player):
     def should_call(self) -> bool:
-        raise NotImplementedError  # self.hand.has_manilha and the rules allow it
+        return self.hand.has_manilha
 
     def answer_call(self, value_called: int) -> Response:
-        raise NotImplementedError  # 50% accept / 50% raise; at 12, accepts
+        if value_called > 12:
+            return Response.ACCEPT
+        return self.rng.choice([Response.ACCEPT, Response.RAISE])
 
     def choose_card(self) -> Card:
-        raise NotImplementedError  # self.hand.strongest()
+        return self.hand.strongest()
