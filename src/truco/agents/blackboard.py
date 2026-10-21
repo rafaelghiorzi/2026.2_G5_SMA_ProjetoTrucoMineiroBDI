@@ -34,7 +34,7 @@ class Inactive(BoardState):
 
     async def run(self) -> None:
         while True:
-            msg = await self.receive()
+            msg = await self.receive(timeout=30)
             if msg is None: continue
             if sender_of(msg) != self.agent.table: continue
 
@@ -157,24 +157,63 @@ class Processing(BoardState):
                 case TalkAction.SPY:
                     first_opponent = self.agent.board.read(self.agent.round, opponents[0])
                     second_opponent = self.agent.board.read(self.agent.round, opponents[1])
-                    continue
-                case TalkAction.LISTEN:
-                    #TODO read_teammate
-                    continue
-                case TalkAction.BLUFF:
-                    #TODO nothing
-                    continue
-                case TalkAction.SEND:
-                    #TODO nothing
+
+                    if first_opponent["action"] == TalkAction.SEND:
+                        await self.send(create_message(
+                            recipient=player,
+                            performative=Performative.INFORM,
+                            content={
+                                "round": self.agent.round,
+                                "value": first_opponent.get("value")
+                            }
+                        ))
+                        continue
+
+                    if second_opponent["action"] == TalkAction.SEND:
+                        await self.send(create_message(
+                            recipient=player,
+                            performative=Performative.INFORM,
+                            content={
+                                "round": self.agent.round,
+                                "value": second_opponent.get("value")
+                            }
+                        ))
+                        continue
+                    
+                    await self.send(create_message(
+                        recipient=player,
+                        performative=Performative.INFORM,
+                        content={
+                            "round": self.agent.round,
+                            "value": None
+                        }
+                    ))
                     continue
 
+                case TalkAction.LISTEN:
+                    mate = self.agent.board.read(round=self.agent.round, player=teammate)
+                    await self.send(create_message(
+                        recipient=player,
+                        performative=Performative.INFORM,
+                        content={
+                            "round": self.agent.round,
+                            "value": mate.get("value") if mate["action"] == TalkAction.SEND else None
+                        }
+                    ))
+                    continue
+
+                case TalkAction.BLUFF:
+                    # nothing
+                    continue
+                case TalkAction.SEND:
+                    # nothing
+                    continue
                 case _:
-                    # TODO nothing
+                    # nothing
                     continue
 
         self.set_next_state(BoardPhase.INACTIVE)
         await self.send(create_message(self.agent.table, Performative.INFORM, {"event": Event.CLOSED}))
-        pass
 
 
 class Board:
@@ -193,7 +232,7 @@ class Board:
         self.data.setdefault(round, {})[player] = dict(content)
 
     def read(self, round: int, player: JID) -> dict[str, object]:
-        """Recupera os dados indexados por jogador; retorna None se algum não existir."""
+        """Recupera os dados indexados por jogador"""
         round_messages = self.data[round]
         player_message = round_messages[player]
         return player_message

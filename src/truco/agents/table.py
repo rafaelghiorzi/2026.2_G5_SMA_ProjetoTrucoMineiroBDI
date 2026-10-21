@@ -12,6 +12,7 @@ from spade.agent import Agent
 from spade.behaviour import FSMBehaviour, State
 from spade.message import Message
 
+from truco.agents.blackboard import BlackBoardAgent
 from truco.communication import create_message, game_template, read_message, sender_of
 from truco.config import (
     POINTS_TO_WIN,
@@ -101,15 +102,38 @@ class StartPoint(TableState):
 class PlayerTalk(TableState):
     async def run(self) -> None:
         table = self.agent
-        # TODO
+
+        await self.send(create_message(
+            recipient=self.agent.board, 
+            performative=Performative.REQUEST, 
+            content= {
+                "action": Event.OPEN
+            }))
+        msg = await self.receive(timeout=30)
+        if msg is None:
+            self.set_next_state(TablePhase.PLAYER_TALK)
+            return
+
+        performative = msg.get_metadata("performative")
+        event, data = read_message(msg)
+        if event != Event.OPEN or performative != Performative.ACCEPT:
+            self.set_next_state(TablePhase.PLAYER_TALK)
+            return
+
         # liberar os quatro agentes para conversarem pelo blackboard
         await self.notify_all({
-            "event": Event.TALK_WINDOW
+            "event": Event.TALK_WINDOW, 
         })
 
         # esperar que a comunicação se encerre 
-        self.set_next_state(TablePhase.START_POINT)
-    pass
+        while True:
+            message = await self.receive(timeout=60)
+            if message is None: continue
+            event, _ = read_message(message)
+            if event == Event.CLOSED: break
+
+        self.set_next_state(TablePhase.TURN)
+        return
 
 
 class Turn(TableState):
@@ -335,9 +359,10 @@ class EndMatch(TableState):
 
 
 class TableAgent(Agent):
-    def __init__(self, jid: JID, password: str, players: list[JID], seed: int | None = None):
+    def __init__(self, jid: JID, password: str, board: JID, players: list[JID], seed: int | None = None):
         super().__init__(str(jid), password)
         # Information board: everything the table knows lives here, and the states read/write it
+        self.board = board
         self.players = players  # seat order: A, B, A, B
         self.rng = random.Random(seed)
         self.score: dict[TEAM, int] = {team: 0 for team in TEAMS}
@@ -362,6 +387,7 @@ class TableAgent(Agent):
 
     async def setup(self) -> None:
         flow = FSMBehaviour()
+        # States
         flow.add_state(TablePhase.START_POINT, StartPoint(), initial=True)
         flow.add_state(TablePhase.PLAYER_TALK, PlayerTalk())
         flow.add_state(TablePhase.TURN, Turn())
@@ -371,8 +397,10 @@ class TableAgent(Agent):
         flow.add_state(TablePhase.END_POINT, EndPoint())
         flow.add_state(TablePhase.END_MATCH, EndMatch())
 
-        flow.add_transition(TablePhase.START_POINT, TablePhase.TURN)
-        # flow.add_transition(TablePhase.PLAYER_TALK, TablePhase.TURN)
+        # Possoble transitions between states
+        flow.add_transition(TablePhase.START_POINT, TablePhase.PLAYER_TALK)
+        flow.add_transition(TablePhase.PLAYER_TALK, TablePhase.PLAYER_TALK)
+        flow.add_transition(TablePhase.PLAYER_TALK, TablePhase.TURN)
         flow.add_transition(TablePhase.TURN, TablePhase.TURN)
         flow.add_transition(TablePhase.TURN, TablePhase.END_ROUND)
         flow.add_transition(TablePhase.TURN, TablePhase.DECLARE)
