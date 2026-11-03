@@ -167,8 +167,8 @@ class TrucoBehaviour(CyclicBehaviour):
         await self.agent.stop()
 
     async def on_reading(self, data: dict) -> None:
-        """Signals the board delivered: {"point", "signals": [{"from": jid, "value": category}]}."""
-        # TODO: turn each signal into an announcement about signal["from"] (Specification 6.2).
+        """Signals the board delivered: {"point", "signals": [{"from": jid, "value": category}], "my_action": TalkAction}."""
+         # TODO: turn each signal into an announcement about signal["from"] (Specification 6.2).
         # - From my partner: Source.PARTNER_SIGNAL. It always arrives; attentive=False if my
         #   action this point was not LISTEN (×0.7, 3.7).
         # - From an opponent (only when my SPY succeeded): Source.SPIED_SIGNAL. It may be a bluff.
@@ -205,17 +205,37 @@ class TrucoBehaviour(CyclicBehaviour):
 
     async def on_talk_window(self, data: dict) -> None:
         """One talk action per point, declared to the board (Specification 6.2)."""
-        # TODO:
-        # 1. action = self.talk(), and remember it: on_reading needs to know if it was LISTEN.
-        #    SPY: draw self.personality.spy_success first; if it fails, declare NOTHING.
-        # 2. value: SEND -> my true category; BLUFF -> Category.STRONG; others -> None.
-        # 3. await self.tell(self.agent.board, Performative.REQUEST,
-        #        {"event": Event.DECLARE, "point": self.agent.point_number,
-        #         "action": action, "value": value})
-        # 4. The signals arrive later, in on_reading. A REJECT from the board must be
-        #    treated as NOTHING.
-        # 5. If the action is SEND (and the board accepted): self.agent.sent_this_point = True
-        raise NotImplementedError
+        action = self.talk()
+        value = None
+
+        match (action):
+            case TalkAction.SPY:
+                if self.rng.random() >= self.personality.spy_success:
+                    action = TalkAction.NOTHING
+            case TalkAction.SEND:
+                value = self.agent.hand.category
+            case TalkAction.BLUFF:
+                value = Category.STRONG
+            case _:
+                pass
+
+        await self.tell(
+            recipient=self.agent.board,
+            performative=Performative.REQUEST,
+            content= {
+                "event": Event.DECLARE,
+                "point": self.agent.point_number,
+                "action": action,
+                "value": value
+            }
+        )
+
+        reply = await self.receive(timeout=TURN_TIMEOUT)
+        accepted = reply is not None and reply.get_metadata("performative") == Performative.ACCEPT
+        if accepted and action == TalkAction.SEND:
+            self.agent.sent_this_point = True
+
+        return None
 
     # --- Shared recipe (How the Agents Decide 3.2–3.5, summary in Appendix A) ---
 
@@ -534,7 +554,7 @@ class Player(Agent):
         self.played: dict[JID, list[Card]] = {}  # cards each player put on the table this point
         self.announcements: dict[JID, Announcement] = {}  # the latest one about each player
         self.rounds: list[bool | None] = []  # this point, from my side: won, lost, None = tie
-        self.sent_this_point = False  # SEND is allowed once per point (3.7)
+        self.sent_this_point = False  # TalkAction is allowed once per point (3.7)
         self.score_ours = 0
         self.score_theirs = 0
         # Fold history: the only memory that survives from one point to the next

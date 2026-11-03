@@ -97,7 +97,12 @@ class ListenAndRecord(CyclicBehaviour):
             if signals:
                 await self.send(create_message(
                     player, Performative.INFORM,
-                    {"event": Event.READING, "point": point, "signals": signals},
+                    {
+                        "event": Event.READING,
+                        "point": point,
+                        "signals": signals,
+                        "my_action": declarations[player]["action"]
+                    },
                 ))
 
     def signals(self, declarations: dict, targets: list[JID], actions: set[TalkAction]) -> list[dict]:
