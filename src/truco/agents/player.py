@@ -168,12 +168,31 @@ class TrucoBehaviour(CyclicBehaviour):
 
     async def on_reading(self, data: dict) -> None:
         """Signals the board delivered: {"point", "signals": [{"from": jid, "value": category}], "my_action": TalkAction}."""
-         # TODO: turn each signal into an announcement about signal["from"] (Specification 6.2).
-        # - From my partner: Source.PARTNER_SIGNAL. It always arrives; attentive=False if my
-        #   action this point was not LISTEN (×0.7, 3.7).
-        # - From an opponent (only when my SPY succeeded): Source.SPIED_SIGNAL. It may be a bluff.
-        # - Ignore it if data["point"] is not the current point (a late message).
-        raise NotImplementedError
+        point = data.get("point")
+        if point is None or point != self.agent.point_number:
+            return
+
+        signals = data.get("signals", [])
+        if signals is None or len(signals) == 0: 
+            return
+        action = data.get("my_action")
+
+        for signal in signals:
+            sender = signal.get("from")
+            category = signal.get("value")
+            if sender is None or action is None or category is None: 
+                continue
+
+            sender = JID(sender)
+            category = Category(category)
+            is_partner = sender == self.agent.partner
+            
+            if not is_partner and action != TalkAction.SPY:
+                continue 
+            
+            source = Source.PARTNER_SIGNAL if is_partner else Source.SPIED_SIGNAL
+            attentive = is_partner and action == TalkAction.LISTEN
+            self.agent.announcements[sender] = Announcement(category, source, attentive)        
 
     # --- Requests: decide and answer (Specification 4.4) ---
 
@@ -554,7 +573,7 @@ class Player(Agent):
         self.played: dict[JID, list[Card]] = {}  # cards each player put on the table this point
         self.announcements: dict[JID, Announcement] = {}  # the latest one about each player
         self.rounds: list[bool | None] = []  # this point, from my side: won, lost, None = tie
-        self.sent_this_point = False  # TalkAction is allowed once per point (3.7)
+        self.sent_this_point = False  # SEND is allowed once per point (3.7)
         self.score_ours = 0
         self.score_theirs = 0
         # Fold history: the only memory that survives from one point to the next
