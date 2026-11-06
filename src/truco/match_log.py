@@ -1,5 +1,5 @@
 """
-Logs one file per math. Agents only call the logger, and this file decides where it goes
+One log file per match. Agents only call the logger; this file decides where it goes.
 """
 
 import logging
@@ -15,7 +15,7 @@ logging.getLogger("truco").propagate = False
 
 def setup_console() -> None:
     """
-    Terminal: only the narration (INFO), never the raw messages
+    Terminal: only the narration (INFO and above), never the raw messages.
     """
     console = logging.StreamHandler()
     console.setLevel(logging.INFO)
@@ -24,7 +24,7 @@ def setup_console() -> None:
 
 def open_match_log(seed: int | None) -> logging.Handler:
     """
-    File: everything plus SPADE erros
+    File: everything from the game, including raw messages, plus SPADE's warnings and errors.
     """
     folder = Path(MATCH_LOG_DIR)
     folder.mkdir(exist_ok=True)

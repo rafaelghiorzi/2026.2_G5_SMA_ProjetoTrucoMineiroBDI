@@ -1,3 +1,9 @@
+"""Writes what happens in a match to a CSV, one line per event.
+
+It measures the experiment and is not part of the game: no agent reads it,
+so it cannot leak anyone's cards.
+"""
+
 import csv
 from pathlib import Path
 
@@ -6,6 +12,8 @@ from slixmpp import JID
 FIELDS = ["match", "seed", "point", "round", "player", "personality", "team", "event", "value", "bet"]
 
 class MetricsRecorder:
+    """Appends events to the CSV file. Call close() when finished, so nothing stays in the buffer."""
+
     def __init__(self, path: str) -> None:
         file = Path(path)
         file.parent.mkdir(parents=True, exist_ok=True)
@@ -21,7 +29,7 @@ class MetricsRecorder:
 
     def start_match(self, seed: int | None, seats: dict[JID, tuple[str, str]]) -> None:
         """
-        Seats: player -> (personality, team)
+        Starts a new match in the file. Seats: player -> (personality, team).
         """
 
         self.match += 1
@@ -29,6 +37,7 @@ class MetricsRecorder:
         self.seats = seats
 
     def event(self, point, round_number, event, player, value, bet) -> None:
+        """Writes one line. Fields that do not apply to the event go as None and stay empty."""
         personality, team = self.seats.get(player, ("", ""))
         self.writer.writerow([
             self.match, self.seed, point, round_number,

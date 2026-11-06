@@ -1,4 +1,4 @@
-"""FIPA-ACL messages of the game (Specification, Section 6).
+"""FIPA-ACL messages of the game.
 
 The vocabulary (events, performatives, ontology) lives in truco.config.
 """
@@ -57,7 +57,7 @@ message_logger = logging.getLogger("truco.messages")
 
 class LoggedSend:
     """
-    Every message of the system goes through here, one place to log all
+    Logs every message before sending it. Goes first in the bases of a behaviour or state.
     """
 
     agent: Agent

@@ -1,4 +1,4 @@
-"""Game rules, without SPADE (Specification, Section 2). The numbers come from truco.config.
+"""Game rules, without SPADE. The numbers come from truco.config.
 
 Players are identified by their JID (slixmpp's type, the same one SPADE uses).
 """
@@ -49,7 +49,7 @@ class Card:
         return self.position >= MANILHA_POSITION
 
 def category_of(strength: float) -> Category:
-    """Kept apart from Hand because the BDI also classifies the strength of whoever played everything."""
+    """Kept apart from Hand because a player with no cards left also declares a category."""
     if strength < WEAK_BELOW:
         return Category.WEAK
     if strength < STRONG_FROM:
@@ -182,7 +182,8 @@ class Point:
 
     def _decision(self) -> tuple[bool, TEAM | None]:
         """
-        Defines the winner of the point, or None if nobody won
+        Returns (is the point finished?, winning team). The team is None while
+        the point goes on, and also when all three rounds tie and nobody scores.
         """
 
         results = self.results
@@ -234,7 +235,7 @@ class Bet:
     value: int = 1                      # how much the point is worth now
     pending: int | None = None          # value called, waiting for an answer
     caller: JID | None = None
-    last_team: TEAM | None = None       # who made the last raise (rule 7)
+    last_team: TEAM | None = None       # who raised last: that team cannot raise again
 
     def _next_level(self) -> int | None:
         current = self.pending if self.pending is not None else self.value
@@ -244,7 +245,7 @@ class Bet:
     def can_call(self, player: JID, round_number: int) -> bool:
         """
         Valid both for calling on one's turn and for raising when answering.
-        The table still checks whether it is their turn (rule 2) or whether they are the one answering.
+        The table still checks whether it is their turn or whether they are the one answering.
         """
         return (
             round_number >= MIN_ROUND_TO_CALL
