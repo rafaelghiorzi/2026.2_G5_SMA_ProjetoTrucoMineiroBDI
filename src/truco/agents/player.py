@@ -23,7 +23,7 @@ from spade.agent import Agent
 from spade.behaviour import CyclicBehaviour
 
 from truco import config
-from truco.communication import create_message, game_template, read_message
+from truco.communication import create_message, game_template, read_message, LoggedSend
 from truco.config import (
     ADVANTAGE_WEIGHT_IN_THRESHOLDS,
     BET_LEVELS,
@@ -56,6 +56,10 @@ from truco.config import (
 )
 from truco.game import Card, Deck, Hand, category_of
 
+import logging
+logger = logging.getLogger("truco.player")
+
+
 # The 29 cards, counted by rank (there are 4 queens, 2 jokers...)
 FULL_DECK: Counter[Card] = Counter(Deck().cards)
 
@@ -78,7 +82,7 @@ class Announcement:
 # ============================================================================
 
 
-class TrucoBehaviour(CyclicBehaviour):
+class TrucoBehaviour(LoggedSend, CyclicBehaviour):
     """Reconsideration on events (Specification 4.3): the player only acts when a message arrives.
 
     Every message goes to the handler of its event. Notices only update the
@@ -168,6 +172,22 @@ class TrucoBehaviour(CyclicBehaviour):
 
     async def on_reading(self, data: dict) -> None:
         """Signals the board delivered: {"point", "signals": [{"from": jid, "value": category}], "my_action": TalkAction}."""
+        if data["point"] != self.agent.point_number:
+            return # Late message from a point that is already over
+
+        listening = TalkAction(data["my_action"]) == TalkAction.LISTEN
+        for signal in data["signals"]:
+            sender = JID(signal["from"])
+            category = Category(signal["value"])
+            if sender == self.agent.partner:
+                # Partner signal arrivers, not listening lowers the trust
+                announcement = Announcement(category, Source.PARTNER_SIGNAL, attentive=listening)
+            else:
+                # Only a successful SPY gets here, but it may be a bluff
+                announcement = Announcement(category, Source.SPIED_SIGNAL)
+            self.agent.announcements[sender] = announcement
+
+        
          # TODO: turn each signal into an announcement about signal["from"] (Specification 6.2).
         # - From my partner: Source.PARTNER_SIGNAL. It always arrives; attentive=False if my
         #   action this point was not LISTEN (×0.7, 3.7).
@@ -390,9 +410,13 @@ class TrucoBehaviour(CyclicBehaviour):
         cards = sorted(self.agent.hand, key=lambda card: card.position)  # weak -> strong
         if len(cards) == 3:
             w = self.personality.opening_3
+            if w is None:
+                raise ValueError("weights are non-existent")
             options, weights = [cards[2], cards[1], cards[0]], [w.strong, w.medium, w.weak]
         else:
             w = self.personality.opening_2
+            if w is None:
+                raise ValueError("weights are non-existent")
             options, weights = [cards[-1], cards[0]], [w.strong, w.weak]
         return self.rng.choices(options, weights=weights)[0]
 
@@ -539,7 +563,7 @@ class Player(Agent):
     ) -> None:
         """`opponents[0]` must be the one who plays right after me: he answers my calls."""
         super().__init__(str(jid), password)
-        self.team = team
+        self.team: TEAM = team
         self.table = table
         self.board = board
         self.point_number = 0  # which point is being played, as told by the table

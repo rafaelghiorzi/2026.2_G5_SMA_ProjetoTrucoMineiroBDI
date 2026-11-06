@@ -2,3 +2,5 @@ __pycache__/
 *.py[cod]
 CLAUDE.md
 TODO.md
+match_logs/
+results/

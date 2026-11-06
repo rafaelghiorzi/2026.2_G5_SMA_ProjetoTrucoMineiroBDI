@@ -5,7 +5,9 @@ The vocabulary (events, performatives, ontology) lives in truco.config.
 
 import json
 
+import logging
 from slixmpp import JID
+from spade.agent import Agent
 from spade.message import Message
 from spade.template import Template
 
@@ -49,3 +51,21 @@ def sender_of(msg: Message) -> JID:
 def game_template() -> Template:
     """Only lets truco messages through, so behaviours don't pick up unrelated messages."""
     return Template(metadata={"ontology": ONTOLOGY})
+
+
+message_logger = logging.getLogger("truco.messages")
+
+class LoggedSend:
+    """
+    Every message of the system goes through here, one place to log all
+    """
+
+    agent: Agent
+
+    async def send(self, msg: Message) -> None:
+        message_logger.debug(
+            "%s -> %s [%s/%s] %s",
+            self.agent.jid.bare, msg.to,
+            msg.get_metadata("performative"), msg.get_metadata("event"), msg.body,
+        )
+        await super().send(msg) # type: ignore[reportAttributeAccssIssue]

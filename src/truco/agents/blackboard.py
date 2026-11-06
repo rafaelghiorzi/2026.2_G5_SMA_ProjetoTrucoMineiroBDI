@@ -4,11 +4,14 @@ from slixmpp import JID
 from spade.agent import Agent
 from spade.behaviour import CyclicBehaviour
 
-from truco.communication import create_message, game_template, read_message, sender_of
+from truco.communication import create_message, game_template, read_message, sender_of, LoggedSend
 from truco.config import Event, Performative, TalkAction
 
+import logging
+logger = logging.getLogger("truco.board")
 
-class ListenAndRecord(CyclicBehaviour):
+
+class ListenAndRecord(LoggedSend, CyclicBehaviour):
     agent: "BlackboardAgent"
 
     async def run(self) -> None:

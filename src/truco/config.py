@@ -13,6 +13,8 @@ from typing import Literal, NamedTuple
 # System
 # ============================================================================
 
+MATCH_LOG_DIR = "match_logs"
+
 # SPADE's embedded XMPP server
 XMPP_DOMAIN = "localhost"
 AGENT_PASSWORD = "truco"

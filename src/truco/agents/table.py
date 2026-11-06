@@ -7,13 +7,14 @@ players and calls the rules at the right time.
 import asyncio
 import random
 
+
 from slixmpp import JID
 from spade.agent import Agent
 from spade.behaviour import FSMBehaviour, State
 from spade.message import Message
 
 from truco.agents.blackboard import BlackboardAgent
-from truco.communication import create_message, game_template, read_message, sender_of
+from truco.communication import create_message, game_template, read_message, sender_of, LoggedSend
 from truco.config import (
     POINTS_TO_WIN,
     TEAM,
@@ -28,8 +29,10 @@ from truco.config import (
 )
 from truco.game import Bet, Card, CardsOnTable, Deck, Hand, Point
 
+import logging
+logger = logging.getLogger("truco.table")
 
-class TableState(State):
+class TableState(LoggedSend, State):
     """Base of the states: only gives the editor the right type for self.agent."""
     agent: "TableAgent"
 
@@ -62,7 +65,7 @@ class TableState(State):
             got, data = read_message(msg)
             if got == event and sender_of(msg) == player:
                 return data
-            print(f"[table] ignored {got} from {sender_of(msg)} while waiting for {event} from {player}")
+            logger.warning(f"Ignored {got} from {sender_of(msg)} while waiting for {event} from {player}")
         return None
 
 
@@ -94,6 +97,8 @@ class StartPoint(TableState):
                 "score": table.score,
             }
             await self.send(create_message(player, Performative.INFORM, content))
+
+        logger.info(f"Inicio do ponto {table.point_number}. Cartas distribuidas")
 
         # 4. Who opens the 1st round of this point. From here on, the Turn state takes over.
         table.turn = table.opener
@@ -165,7 +170,7 @@ class Turn(TableState):
         # 2. Wait for the answer. No answer in time: ask again.
         msg = await self.receive(timeout=TURN_TIMEOUT)
         if msg is None:
-            print(f"[table] {table.turn} did not play in time, asking again")
+            logger.warning(f"{table.turn} did not play in time, asking again")
             self.set_next_state(TablePhase.TURN)
             return
 
@@ -174,13 +179,14 @@ class Turn(TableState):
         if event == Event.CALL and sender_of(msg) == table.turn and can_call:
             value = table.bet.call(table.turn)
             await self.announce_call(table.turn, value)
+            logger.info(f"O jogador {table.turn} pediu truco!")
             self.set_next_state(TablePhase.DECLARE)
             return
 
         # 4. Otherwise it must be a card. Invalid: ignored, the turn stays with the same player.
         card = self.valid_card(msg)
         if card is None:
-            print(f"[table] invalid play from {sender_of(msg)}: {msg.body}")
+            logger.warning(f"Invalid play from {sender_of(msg)}: {msg.body}")
             self.set_next_state(TablePhase.TURN)
             return
 
@@ -192,6 +198,7 @@ class Turn(TableState):
             "player": table.turn,
             "card": card.rank,
         })
+        logger.info(f"Jogador {table.turn} jogou a carta {card.rank}")
 
         # 6. A full round goes to END_ROUND; otherwise the turn moves on.
         if len(table.cards_on_table) == len(table.players):
@@ -234,7 +241,7 @@ class Declare(TableState):
             ))
             data = await self.wait_for(declarer, Event.DECLARATION)
             if data is None:
-                print(f"[table] {declarer} did not declare in time, skipping")
+                logger.warning(f"{declarer} did not declare in time, skipping")
                 continue
             try:
                 category = Category(data.get("category"))
@@ -245,6 +252,7 @@ class Declare(TableState):
                 "player": declarer,
                 "category": category,
             })
+            logger.info(f"Jogador {declarer} declarou sua mão {category}")
 
         self.set_next_state(TablePhase.AWAIT_ANSWER)
 
@@ -280,12 +288,15 @@ class AwaitAnswer(TableState):
         #    raise = accept + call the next level: a new call, with its own declarations.
         if response == Response.FOLD:
             table.fold_result = bet.fold()
+            logger.info(f"Jogador {responder} decidiu fugir!")
             self.set_next_state(TablePhase.END_POINT)
         elif response == Response.ACCEPT:
             bet.accept()
+            logger.info(f"Jogador {responder} aceitou o truco!")
             self.set_next_state(TablePhase.TURN)
         else:
             new_value = bet.raise_bet(responder)
+            logger.info(f"Jogador {responder} quer aumentar a aposta!")
             await self.announce_call(responder, new_value)
             self.set_next_state(TablePhase.DECLARE)
 
@@ -316,10 +327,13 @@ class EndRound(TableState):
             "winner": winner
             })
 
+        logger.info(f"Fim da rodada, a equipe {winner} venceu.")
+
         # 3. End the point
         if table.point.finished:
             self.set_next_state(TablePhase.END_POINT)
         else:
+            logger.info(f"Iniciando próxima rodada")
             table.turn = table.point.who_starts(table.cards_on_table)
             table.cards_on_table = []
             self.set_next_state(TablePhase.TURN)
@@ -344,6 +358,12 @@ class EndPoint(TableState):
             "score": table.score
         })
 
+        logger.info(f"Fim do ponto, a equipe {winner} ganhou mais {points} ponto(s).")
+        logger.info("Placar atual:")
+        for time, pontos in table.score.items():
+            logger.info(f"  Time {time}: {pontos} ponto(s).")
+
+
         for points in table.score.values():
             if points >= POINTS_TO_WIN:
                 self.set_next_state(TablePhase.END_MATCH)
@@ -364,6 +384,10 @@ class EndMatch(TableState):
             "score" : table.score
 
         })
+
+        logger.info(f"A partida acabou! Placar final:")
+        for time, pontos in table.score.items():
+            logger.info(f"  Time {time}: {pontos} ponto(s).")
 
         await table.stop()
 
