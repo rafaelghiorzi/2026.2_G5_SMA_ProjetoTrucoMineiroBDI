@@ -105,9 +105,13 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
             return
         event, data = read_message(msg)
         handler = self.handlers.get(event)
-        if handler is not None:
+        if handler is None:
+            return
+        try:
             await handler(data)
-
+        except Exception:
+            logger.exception(f"{self.agent.me} falhou o handling: {event}")
+        
     @property
     def handlers(self) -> dict[Event, Callable[[dict], Awaitable[None]]]:
         return {

@@ -14,6 +14,8 @@ from typing import Literal, NamedTuple
 # ============================================================================
 
 MATCH_LOG_DIR = "match_logs"
+MAX_RETRIES = 3
+THINK_TIME: tuple[float, float] | None = (1.0, 5.0)
 
 # SPADE's embedded XMPP server
 XMPP_DOMAIN = "localhost"
