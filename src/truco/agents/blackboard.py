@@ -6,6 +6,7 @@ from spade.behaviour import CyclicBehaviour
 
 from truco.communication import create_message, game_template, read_message, sender_of, LoggedSend
 from truco.config import Event, Performative, TalkAction
+from truco.metrics import MetricsRecorder
 
 import logging
 logger = logging.getLogger("truco.board")
@@ -22,8 +23,6 @@ class ListenAndRecord(LoggedSend, CyclicBehaviour):
         sender = sender_of(msg)
 
         match event:
-            case Event.QUERY:
-                await self.answer(sender, data)
             case Event.DECLARE:
                 await self.declare(sender, data)
             case Event.OPEN:
@@ -36,23 +35,11 @@ class ListenAndRecord(LoggedSend, CyclicBehaviour):
             case Event.CLOSED:
                 await self.close_talk(data["point"])
                 await self.ack(event, data)
-            case _:
-                self.agent.record(event, data)
-                await self.ack(event, data)
 
     async def ack(self, event: Event, data: dict) -> None:
         """Confirma à mesa que gravou: só depois disso ela avisa os jogadores."""
         await self.send(create_message(
             self.agent.table, Performative.ACCEPT, {"event": event, "point": data.get("point")},
-        ))
-
-    async def answer(self, asker: JID, data: dict) -> None:
-        point = self.agent.points.get(data["point"])
-        if point is None:
-            await self.send(create_message(asker, Performative.REJECT, {"event": Event.QUERY, **data}))
-            return
-        await self.send(create_message(
-            asker, Performative.INFORM, {"event": Event.QUERY, "point": data["point"], "data": point},
         ))
 
     # --- Conversa ---
@@ -90,6 +77,8 @@ class ListenAndRecord(LoggedSend, CyclicBehaviour):
         players, declarations = talk["players"], talk["declarations"]
         for player in players:
             declarations.setdefault(player, {"action": TalkAction.NOTHING, "value": None})
+            if self.agent.recorder is not None:
+                self.agent.recorder.event(point, None, "talk", player, declarations[player]["action"], None)
 
         for i, player in enumerate(players):
             partner = players[(i + 2) % 4]
@@ -119,17 +108,11 @@ class ListenAndRecord(LoggedSend, CyclicBehaviour):
 
 
 class BlackboardAgent(Agent):
-    def __init__(self, jid: JID, password: str, table: JID) -> None:
+    def __init__(self, jid: JID, password: str, table: JID, recorder: MetricsRecorder | None = None) -> None:
         super().__init__(str(jid), password)
         self.table = table
-        self.points: dict[int, dict[str, list[dict]]] = {}  # ponto -> {evento: [dados, ...]}
+        self.recorder = recorder
         self.talks: dict[int, dict] = {}  # ponto -> {"players", "declarations", "open"}
-
-    def record(self, event: Event, data: dict) -> None:
-        point = data.get("point")
-        if not isinstance(point, int):
-            return
-        self.points.setdefault(point, {}).setdefault(event, []).append(data)
 
     async def setup(self) -> None:
         self.add_behaviour(ListenAndRecord(), game_template())

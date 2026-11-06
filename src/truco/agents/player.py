@@ -1,16 +1,3 @@
-"""Players of the match (Specification 4 and 5; How the Agents Decide 3 and 4).
-
-Player is the agent: who it is, where it sits, and what it believes. How it plays
-is a behaviour plugged into it:
-
-    Player("p1@localhost", ..., behaviour=Grinder())
-
-TrucoBehaviour is the generic behaviour: it reacts to every event from the table,
-keeps the player's beliefs up to date and runs the decision recipe shared by
-everyone. The rules that change from one personality to another are abstract
-methods, implemented by the four personalities at the end of this file.
-"""
-
 import random
 import asyncio
 from abc import abstractmethod
@@ -266,11 +253,6 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
             }
         )
 
-        reply = await self.receive(timeout=TURN_TIMEOUT)
-        accepted = reply is not None and reply.get_metadata("performative") == Performative.ACCEPT
-        if accepted and action == TalkAction.SEND:
-            self.agent.sent_this_point = True
-
         return None
 
     # --- Shared recipe (How the Agents Decide 3.2–3.5, summary in Appendix A) ---
@@ -404,19 +386,12 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
         return category_of(self.hand_strength())
 
     def talk(self) -> TalkAction:
-        """Draw from the personality's talk table after the common-sense rules (3.7)."""
-        weights = dict(self.personality.talk)  # a copy: the personality's table is shared
-        has_cards = len(self.agent.hand) > 0
+        """Draw from the personality's talk table after the common-sense rules."""
+        weights = dict(self.personality.talk)  # a copy: the personality's table is shared\
 
         # With a strong hand, the weight of BLUFF moves to SEND (bluffing only makes sense without a hand)
-        if has_cards and self.agent.hand.category == Category.STRONG:
+        if self.agent.hand.category == Category.STRONG:
             weights[TalkAction.SEND] += weights.pop(TalkAction.BLUFF)
-        # Whoever already sent this point, or has no cards, cannot SEND
-        if self.agent.sent_this_point or not has_cards:
-            weights.pop(TalkAction.SEND, None)
-        # Whoever has no cards cannot BLUFF either
-        if not has_cards:
-            weights.pop(TalkAction.BLUFF, None)
 
         actions = list(weights)
         return self.rng.choices(actions, weights=[weights[action] for action in actions])[0]
@@ -594,7 +569,6 @@ class Player(Agent):
         self.played: dict[JID, list[Card]] = {}  # cards each player put on the table this point
         self.announcements: dict[JID, Announcement] = {}  # the latest one about each player
         self.rounds: list[bool | None] = []  # this point, from my side: won, lost, None = tie
-        self.sent_this_point = False  # TalkAction is allowed once per point (3.7)
         self.score_ours = 0
         self.score_theirs = 0
         # Fold history: the only memory that survives from one point to the next
@@ -614,7 +588,6 @@ class Player(Agent):
         self.played = {player: [] for player in self.everyone}
         self.announcements = {}
         self.rounds = []
-        self.sent_this_point = False
 
     def record_score(self, score: dict[TEAM, int]) -> None:
         self.score_ours = score[self.team]

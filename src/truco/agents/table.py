@@ -1,19 +1,11 @@
-"""Table: referee and environment (Specification, Section 3). Reactive, state machine.
-
-The rules live in truco.game; the table only keeps the board, talks to the
-players and calls the rules at the right time.
-"""
-
 import asyncio
 import random
-
-
 from slixmpp import JID
 from spade.agent import Agent
 from spade.behaviour import FSMBehaviour, State
 from spade.message import Message
 
-from truco.agents.blackboard import BlackboardAgent
+from truco.metrics import MetricsRecorder
 from truco.communication import create_message, game_template, read_message, sender_of, LoggedSend
 from truco.config import (
     POINTS_TO_WIN,
@@ -47,6 +39,7 @@ class TableState(LoggedSend, State):
         """Public notice of a call (or raise): everyone hears it, and it says who must answer."""
         table = self.agent
         table.answering = table.bet.responder(caller)
+        table.record("call", caller, value, value)
         await self.notify_all({
             "event": Event.CALL,
             "player": caller,
@@ -164,6 +157,8 @@ class Turn(TableState):
     async def run(self) -> None:
         table = self.agent
         can_call = table.bet.can_call(table.turn, table.point.current_round)
+        if can_call:
+            table.record("call_chance", table.turn, None, table.bet.value)
 
         # 1. Ask whoever has the turn to play, telling them whether they may call.
         await self.send(create_message(
@@ -178,7 +173,9 @@ class Turn(TableState):
             table.strikes = 0
             value = table.bet.call(table.turn)
             await self.announce_call(table.turn, value)
+            
             logger.info(f"O jogador {table.turn} pediu truco!")
+
             self.set_next_state(TablePhase.DECLARE)
             return
 
@@ -287,6 +284,7 @@ class AwaitAnswer(TableState):
 
         # 2. Everyone hears the answer.
         responder = table.answering
+        table.record("response", responder, response, bet.pending)
         await self.notify_all({
             "event": Event.RESPONSE,
             "player": responder,
@@ -360,6 +358,7 @@ class EndPoint(TableState):
             winner, points = table.point.point_winner(), table.bet.value
         if winner is not None:
             table.score[winner] += points
+        table.record("point_end", None, winner, points)
 
         await self.notify_all({
             "event" : Event.POINT_END,
@@ -388,6 +387,8 @@ class EndMatch(TableState):
 
     async def run(self) -> None:
         table = self.agent
+        winner = max(table.score, key=lambda team: table.score[team])
+        table.record("match_end", None, winner, table.score[winner])
 
         await self.notify_all({
             "event" : Event.MATCH_END,
@@ -403,7 +404,7 @@ class EndMatch(TableState):
 
 
 class TableAgent(Agent):
-    def __init__(self, jid: JID, password: str, board: JID, players: list[JID], seed: int | None = None):
+    def __init__(self, jid: JID, password: str, board: JID, players: list[JID], seed: int | None = None, recorder: MetricsRecorder | None = None):
         super().__init__(str(jid), password)
         # Information board: everything the table knows lives here, and the states read/write it
         self.board = board
@@ -420,6 +421,18 @@ class TableAgent(Agent):
         self.answering = self.opener  # who must answer the current call
         self.fold_result: tuple[TEAM, int] | None = None  # set when a point ends by folding
         self.strikes = 0
+        self.recorder = recorder
+
+    def record(self, event: str, player: JID | None, value: object, bet: int | None) -> None:
+        if self.recorder is not None:
+            self.recorder.event(
+                self.point_number,
+                None if self.point.finished else self.point.current_round,  # finished: no round in play
+                event,
+                player,
+                value,
+                bet
+            )
 
     def next_seat(self, player: JID) -> JID:
         """Next seat in play order."""

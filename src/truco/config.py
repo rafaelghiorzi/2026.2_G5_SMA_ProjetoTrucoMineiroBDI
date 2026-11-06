@@ -14,6 +14,7 @@ from typing import Literal, NamedTuple
 # ============================================================================
 
 MATCH_LOG_DIR = "match_logs"
+RESULTS_FILE = "results/events.csv"
 MAX_RETRIES = 3
 THINK_TIME: tuple[float, float] | None = (1.0, 5.0)
 
@@ -143,7 +144,6 @@ class Event(StrEnum):
     READING = "reading"    # board -> player: only for LISTEN and SPY
     # board -> table: Performative: INFORM; Payload: point
     CLOSED = "closed"  # board -> table
-    QUERY = "query"
 
 
 class Response(StrEnum):
@@ -184,18 +184,6 @@ class TablePhase(StrEnum):
     END_ROUND = "END_ROUND"
     END_POINT = "END_POINT"
     END_MATCH = "END_MATCH"
-
-
-# ============================================================================
-# Board
-# ============================================================================
-
-class BoardPhase(StrEnum):
-    """Names of the states in the table's state machine."""
-
-    INACTIVE = "INACTIVE"
-    OPEN = "OPEN"
-    PROCESSING = "PROCESSING"
 
 
 # ============================================================================
