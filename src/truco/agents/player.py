@@ -12,6 +12,7 @@ methods, implemented by the four personalities at the end of this file.
 """
 
 import random
+import asyncio
 from abc import abstractmethod
 from collections import Counter
 from collections.abc import Awaitable, Callable
@@ -45,6 +46,7 @@ from truco.config import (
     ROUND_BALANCE_WEIGHT,
     TEAM,
     TURN_TIMEOUT,
+    THINK_TIME,
     Category,
     Event,
     Performative,
@@ -59,8 +61,7 @@ from truco.game import Card, Deck, Hand, category_of
 import logging
 logger = logging.getLogger("truco.player")
 
-
-# The 29 cards, counted by rank (there are 4 queens, 2 jokers...)
+# The 29 cards, counted by rank
 FULL_DECK: Counter[Card] = Counter(Deck().cards)
 
 
@@ -83,7 +84,8 @@ class Announcement:
 
 
 class TrucoBehaviour(LoggedSend, CyclicBehaviour):
-    """Reconsideration on events (Specification 4.3): the player only acts when a message arrives.
+    """
+    The player only acts when a message arrives.
 
     Every message goes to the handler of its event. Notices only update the
     beliefs; requests (YOUR_TURN, ASK_DECLARATION, ASK_RESPONSE, TALK_WINDOW) also
@@ -93,10 +95,19 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
     agent: "Player"
     personality: Personality  # each personality defines it
 
-    def __init__(self, rng: random.Random | None = None) -> None:
-        """`rng` lets the simulations fix a seed; without it, a fresh generator is used."""
+    def __init__(self, rng: random.Random | None = None,
+                 think_time: tuple[float, float] | None = THINK_TIME) -> None:
         super().__init__()
         self.rng = rng or random.Random()
+        self.think_time = think_time
+        self.think_rng = random.Random()
+
+    async def think(self) -> None:
+        """
+        Pretends to think before answering a request
+        """
+        if self.think_time is not None:
+            await asyncio.sleep(self.think_rng.uniform(*self.think_time))
 
     async def run(self) -> None:
         # In SPADE, receive() without a timeout returns at once; with one, it waits for a message
@@ -191,19 +202,14 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
                 announcement = Announcement(category, Source.SPIED_SIGNAL)
             self.agent.announcements[sender] = announcement
 
-        
-         # TODO: turn each signal into an announcement about signal["from"] (Specification 6.2).
-        # - From my partner: Source.PARTNER_SIGNAL. It always arrives; attentive=False if my
-        #   action this point was not LISTEN (×0.7, 3.7).
-        # - From an opponent (only when my SPY succeeded): Source.SPIED_SIGNAL. It may be a bluff.
-        # - Ignore it if data["point"] is not the current point (a late message).
-        raise NotImplementedError
-
     # --- Requests: decide and answer (Specification 4.4) ---
 
     async def on_your_turn(self, data: dict) -> None:
         """Either call truco or play a card. If the call is accepted, the table sends
-        YOUR_TURN again (Specification 2.4, rule 8) and this runs once more."""
+        YOUR_TURN again and this runs once more."""
+
+        await self.think()
+
         table = self.agent.table
         if data["can_call"] and self.should_call():
             await self.tell(table, Performative.PROPOSE, {"event": Event.CALL})
@@ -212,6 +218,8 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
         await self.tell(table, Performative.INFORM, {"event": Event.CARD_PLAYED, "card": card.rank})
 
     async def on_ask_declaration(self, data: dict) -> None:
+        await self.think()
+
         await self.tell(
             self.agent.table,
             Performative.INFORM,
@@ -219,6 +227,8 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
         )
 
     async def on_ask_response(self, data: dict) -> None:
+        await self.think()
+
         response = self.answer_call(data["value"])
         performative = {
             Response.FOLD: Performative.REJECT,
@@ -228,7 +238,9 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
         await self.tell(self.agent.table, performative, {"event": Event.RESPONSE, "response": response})
 
     async def on_talk_window(self, data: dict) -> None:
-        """One talk action per point, declared to the board (Specification 6.2)."""
+        """One talk action per point, declared to the board"""
+
+        await self.think()
         action = self.talk()
         value = None
 
