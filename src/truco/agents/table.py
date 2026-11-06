@@ -1,24 +1,26 @@
-"""Table: referee and environment (Specification, Section 3). Reactive, state machine.
+"""Table: referee and environment. A reactive state machine, not a BDI agent.
 
-The rules live in truco.game; the table only keeps the board, talks to the
-players and calls the rules at the right time.
+The rules live in truco.game. The table deals, validates plays, applies the rules at
+the right time and tells the players what happened. It opens and closes the talk
+window on the blackboard, but never sees what the players say there.
 """
 
 import asyncio
 import random
-
 from slixmpp import JID
 from spade.agent import Agent
 from spade.behaviour import FSMBehaviour, State
 from spade.message import Message
 
-from truco.agents.blackboard import BlackboardAgent
-from truco.communication import create_message, game_template, read_message, sender_of
+from truco.metrics import MetricsRecorder
+from truco.communication import create_message, game_template, read_message, sender_of, LoggedSend
 from truco.config import (
     POINTS_TO_WIN,
     TEAM,
     TEAMS,
     TURN_TIMEOUT,
+    TALK_TIMEOUT,
+    MAX_RETRIES,
     Category,
     Event,
     Performative,
@@ -28,9 +30,11 @@ from truco.config import (
 )
 from truco.game import Bet, Card, CardsOnTable, Deck, Hand, Point
 
+import logging
+logger = logging.getLogger("truco.table")
 
-class TableState(State):
-    """Base of the states: only gives the editor the right type for self.agent."""
+class TableState(LoggedSend, State):
+    """Base of the states: the messaging helpers they share, and the right type for self.agent."""
     agent: "TableAgent"
 
     async def notify_all(self, content: dict) -> None:
@@ -42,6 +46,7 @@ class TableState(State):
         """Public notice of a call (or raise): everyone hears it, and it says who must answer."""
         table = self.agent
         table.answering = table.bet.responder(caller)
+        table.record("call", caller, value, value)
         await self.notify_all({
             "event": Event.CALL,
             "player": caller,
@@ -49,20 +54,32 @@ class TableState(State):
             "responder": table.answering,
         })
 
-    async def wait_for(self, player: JID, event: Event) -> dict | None:
-        """Waits up to TURN_TIMEOUT for `event` from `player` and returns its data.
-
-        Any other message that arrives meanwhile is ignored. None = it did not come.
+    async def wait_from(self, player: JID, timeout: float = TURN_TIMEOUT) -> Message | None:
         """
-        deadline = asyncio.get_running_loop().time() + TURN_TIMEOUT
+        The next message from `player`. Messages from anyone else are discarded
+        """
+        deadline = asyncio.get_running_loop().time() + timeout
         while (remaining := deadline - asyncio.get_running_loop().time()) > 0:
             msg = await self.receive(timeout=remaining)
             if msg is None:
                 return None
+            if sender_of(msg) == player:
+                return msg
+            logger.debug(f"Discarded {msg.get_metadata("event")} from {sender_of(msg)}, waiting for {player}")
+        return None
+
+    async def wait_for(self, player: JID, event: Event, timeout: float = TURN_TIMEOUT) -> dict | None:
+        """
+        Waits up to `timeout` for `event` from `player` and returns its data. None = it did not come.
+        """
+        deadline = asyncio.get_running_loop().time() + timeout
+        while (remaining := deadline - asyncio.get_running_loop().time()) > 0:
+            msg = await self.wait_from(player, remaining)
+            if msg is None:
+                return None
             got, data = read_message(msg)
-            if got == event and sender_of(msg) == player:
+            if got == event:
                 return data
-            print(f"[table] ignored {got} from {sender_of(msg)} while waiting for {event} from {player}")
         return None
 
 
@@ -95,6 +112,8 @@ class StartPoint(TableState):
             }
             await self.send(create_message(player, Performative.INFORM, content))
 
+        logger.info(f"Inicio do ponto {table.point_number}. Cartas distribuidas")
+
         # 4. Who opens the 1st round of this point. From here on, the Turn state takes over.
         table.turn = table.opener
         self.set_next_state(TablePhase.PLAYER_TALK)
@@ -103,86 +122,82 @@ class StartPoint(TableState):
 class PlayerTalk(TableState):
     """
     The talk window of the point: one per point, after the deal and before the first card.
+    Whatever happens in it, the game moves on to TURN
     """
 
     async def run(self) -> None:
         table = self.agent
-
-        # 1. Open the board for this point. The number lets it refuse late declarations.
-        await self.send(create_message(
-            recipient=table.board,
-            performative=Performative.REQUEST,
-            content={
-                "event": Event.OPEN,
-                "point": table.point_number,
-                "players": table.players,
-            }))
-
-        msg = await self.receive(timeout=30)
-        if msg is None:
-            self.set_next_state(TablePhase.PLAYER_TALK)
-            return
-
-        performative = msg.get_metadata("performative")
-        event, data = read_message(msg)
-        if event != Event.OPEN or performative != Performative.ACCEPT:
-            self.set_next_state(TablePhase.PLAYER_TALK)
-            return
-
-        # 2. Only now the four players are released to talk through the board
-        await self.notify_all({
-            "event": Event.TALK_WINDOW,
-            "point": table.point_number,
-        })
-
-        # esperar que a comunicação se encerre 
-        while True:
-            message = await self.receive(timeout=60)
-            if message is None: continue
-            event, _ = read_message(message)
-            if event == Event.CLOSED: break
-
         self.set_next_state(TablePhase.TURN)
-        return
+
+        # 1. Open the board. If it does not answer, this point simply has no conversation.
+        await self.send(create_message(
+            table.board, Performative.REQUEST,
+            {"event": Event.OPEN, "point": table.point_number, "players": table.players},
+        ))
+        if await self.wait_for(table.board, Event.OPEN) is None:
+            logger.error("board did not open point %d; skipping the talk", table.point_number)
+            return
+
+        # 2. Only now the four players are released to talk through the board.
+        await self.notify_all({"event": Event.TALK_WINDOW, "point": table.point_number})
+
+        # 3. Normal case: everyone declared and the board warns us before the deadline.
+        if await self.wait_for(table.board, Event.CLOSED, TALK_TIMEOUT) is not None:
+            return
+
+        # 4. Deadline: the board fills the missing players with NOTHING and delivers the signals.
+        logger.warning("talk deadline in point %d; asking the board to close", table.point_number)
+        await self.send(create_message(
+            table.board, Performative.REQUEST, {"event": Event.CLOSED, "point": table.point_number},
+        ))
+        if await self.wait_for(table.board, Event.CLOSED) is None:
+            logger.error("board did not close point %d; moving on anyway", table.point_number)
 
 
 class Turn(TableState):
     """Asks whoever has the turn to play and waits for the card or a truco call.
 
-    Each run handles ONE message. If nothing valid arrives, the state points
-    to itself (TURN -> TURN) and asks the same player again.
+    Each run handles ONE answer. If nothing valid arrives, the state points to itself
+    (TURN -> TURN) and asks again. After MAX_RETRIES failures, the table plays the
+    player's weakest card, so a broken player never blocks the match.
     """
 
     async def run(self) -> None:
         table = self.agent
         can_call = table.bet.can_call(table.turn, table.point.current_round)
+        if can_call:
+            table.record("call_chance", table.turn, None, table.bet.value)
 
         # 1. Ask whoever has the turn to play, telling them whether they may call.
         await self.send(create_message(
             table.turn, Performative.REQUEST, {"event": Event.YOUR_TURN, "can_call": can_call},
         ))
 
-        # 2. Wait for the answer. No answer in time: ask again.
-        msg = await self.receive(timeout=TURN_TIMEOUT)
-        if msg is None:
-            print(f"[table] {table.turn} did not play in time, asking again")
-            self.set_next_state(TablePhase.TURN)
-            return
+        # 2. Wait for this player's answer. Messages from anyone else are discarded.
+        msg = await self.wait_from(table.turn)
 
-        # 3. A truco call (Specification 2.4, rules 1 and 2): announce it and go to the declarations.
-        event, _ = read_message(msg)
-        if event == Event.CALL and sender_of(msg) == table.turn and can_call:
+        # 3. A truco call: announce it and go to the declarations.
+        if msg is not None and can_call and read_message(msg)[0] == Event.CALL:
+            table.strikes = 0
             value = table.bet.call(table.turn)
             await self.announce_call(table.turn, value)
+            
+            logger.info(f"O jogador {table.turn} pediu truco!")
+
             self.set_next_state(TablePhase.DECLARE)
             return
 
-        # 4. Otherwise it must be a card. Invalid: ignored, the turn stays with the same player.
-        card = self.valid_card(msg)
+        # 4. Otherwise it must be a card. Missing or invalid: try again, then force it.
+        card = None if msg is None else self.valid_card(msg)
         if card is None:
-            print(f"[table] invalid play from {sender_of(msg)}: {msg.body}")
-            self.set_next_state(TablePhase.TURN)
-            return
+            table.strikes += 1
+            logger.warning("no valid play from %s (%d/%d)", table.turn, table.strikes, MAX_RETRIES)
+            if table.strikes < MAX_RETRIES:
+                self.set_next_state(TablePhase.TURN)
+                return
+            card = table.hands[table.turn].weakest()
+            logger.error("%s did not answer; the table plays %s", table.turn, card.rank)
+        table.strikes = 0
 
         # 5. Apply it to the board and notify the 4 (including the player: it is the confirmation).
         table.hands[table.turn].remove(card)
@@ -192,6 +207,7 @@ class Turn(TableState):
             "player": table.turn,
             "card": card.rank,
         })
+        logger.info(f"Jogador {table.turn} jogou a carta {card.rank}")
 
         # 6. A full round goes to END_ROUND; otherwise the turn moves on.
         if len(table.cards_on_table) == len(table.players):
@@ -201,7 +217,7 @@ class Turn(TableState):
             self.set_next_state(TablePhase.TURN)
 
     def valid_card(self, msg: Message) -> Card | None:
-        """The card played, if the play is valid (Specification 3, item 2). Otherwise, None."""
+        """The card played, if the play is valid. Otherwise, None."""
         table = self.agent
         event, data = read_message(msg)
         if event != Event.CARD_PLAYED:
@@ -218,7 +234,7 @@ class Turn(TableState):
 
 
 class Declare(TableState):
-    """Before answering, the answering pair declares in public (Specification 2.4 rule 4, 6.3).
+    """Before answering, the answering pair declares in public.
 
     First the responder's partner, then the responder. A player who does not take part
     (control players) answers with a null category, and whoever does not answer in time
@@ -234,7 +250,7 @@ class Declare(TableState):
             ))
             data = await self.wait_for(declarer, Event.DECLARATION)
             if data is None:
-                print(f"[table] {declarer} did not declare in time, skipping")
+                logger.warning(f"{declarer} did not declare in time, skipping")
                 continue
             try:
                 category = Category(data.get("category"))
@@ -245,30 +261,37 @@ class Declare(TableState):
                 "player": declarer,
                 "category": category,
             })
+            logger.info(f"Jogador {declarer} declarou sua mão {category}")
 
         self.set_next_state(TablePhase.AWAIT_ANSWER)
 
 
 class AwaitAnswer(TableState):
-    """Asks the responder to fold, accept or raise (Specification 2.4, rules 3 to 8)."""
+    """Asks the responder to fold, accept or raise. After MAX_RETRIES failures, it counts as a fold."""
 
     async def run(self) -> None:
         table = self.agent
         bet = table.bet
 
-        # 1. Ask the responder. No valid answer in time: ask again (without redoing the declarations).
+        # 1. Ask the responder. No valid answer in time: ask again, without redoing the declarations.
         await self.send(create_message(
             table.answering, Performative.PROPOSE, {"event": Event.ASK_RESPONSE, "value": bet.pending},
         ))
         data = await self.wait_for(table.answering, Event.RESPONSE)
         response = self.valid_response(data)
         if response is None:
-            print(f"[table] no valid answer from {table.answering}, asking again")
-            self.set_next_state(TablePhase.AWAIT_ANSWER)
-            return
+            table.strikes += 1
+            logger.warning(f"Sem resposta válida de {table.answering} ({table.strikes}/{MAX_RETRIES})")
+            if table.strikes < MAX_RETRIES:
+                self.set_next_state(TablePhase.AWAIT_ANSWER)
+                return
+            response = Response.FOLD # Whoever never answers runs away
+            logger.error(f"{table.answering} Não responder. Contando como fuga.")
+        table.strikes = 0
 
         # 2. Everyone hears the answer.
         responder = table.answering
+        table.record("response", responder, response, bet.pending)
         await self.notify_all({
             "event": Event.RESPONSE,
             "player": responder,
@@ -276,16 +299,19 @@ class AwaitAnswer(TableState):
             "value": bet.pending,
         })
 
-        # 3. Fold ends the point; accept gives the turn back to whoever had it (rule 8);
+        # 3. Fold ends the point; accept gives the turn back to whoever had it;
         #    raise = accept + call the next level: a new call, with its own declarations.
         if response == Response.FOLD:
             table.fold_result = bet.fold()
+            logger.info(f"Jogador {responder} decidiu fugir!")
             self.set_next_state(TablePhase.END_POINT)
         elif response == Response.ACCEPT:
             bet.accept()
+            logger.info(f"Jogador {responder} aceitou o truco!")
             self.set_next_state(TablePhase.TURN)
         else:
             new_value = bet.raise_bet(responder)
+            logger.info(f"Jogador {responder} quer aumentar a aposta!")
             await self.announce_call(responder, new_value)
             self.set_next_state(TablePhase.DECLARE)
 
@@ -304,6 +330,8 @@ class AwaitAnswer(TableState):
 
 
 class EndRound(TableState):
+    """Decides the round and either ends the point or gives the next round to whoever opens it."""
+
     async def run(self) -> None:
         table = self.agent
 
@@ -316,16 +344,24 @@ class EndRound(TableState):
             "winner": winner
             })
 
+        if winner is None:
+            logger.info(f"A rodada acabou com um empate!")
+        else: 
+            logger.info(f"Fim da rodada, a equipe {winner} venceu.")
+
         # 3. End the point
         if table.point.finished:
             self.set_next_state(TablePhase.END_POINT)
         else:
+            logger.info(f"Iniciando próxima rodada")
             table.turn = table.point.who_starts(table.cards_on_table)
             table.cards_on_table = []
             self.set_next_state(TablePhase.TURN)
 
 
 class EndPoint(TableState):
+    """Adds the points to the score and either ends the match or starts the next point."""
+
     async def run(self) -> None:
         table = self.agent
 
@@ -336,6 +372,7 @@ class EndPoint(TableState):
             winner, points = table.point.point_winner(), table.bet.value
         if winner is not None:
             table.score[winner] += points
+        table.record("point_end", None, winner, points)
 
         await self.notify_all({
             "event" : Event.POINT_END,
@@ -343,6 +380,15 @@ class EndPoint(TableState):
             "points": points,
             "score": table.score
         })
+
+        if winner is None:
+            logger.info("Fim do ponto: as três rodadas empataram e ninguém pontuou.")
+        else:
+            logger.info(f"Fim do ponto, a equipe {winner} ganhou mais {points} ponto(s).")
+        logger.info("Placar atual:")
+        for time, pontos in table.score.items():
+            logger.info(f"  Time {time}: {pontos} ponto(s).")
+
 
         for points in table.score.values():
             if points >= POINTS_TO_WIN:
@@ -354,10 +400,12 @@ class EndPoint(TableState):
 
 
 class EndMatch(TableState):
-    """Final state: no outgoing transition, the FSM stops here."""
+    """Final state: announces the result and stops the table."""
 
     async def run(self) -> None:
         table = self.agent
+        winner = max(table.score, key=lambda team: table.score[team])
+        table.record("match_end", None, winner, table.score[winner])
 
         await self.notify_all({
             "event" : Event.MATCH_END,
@@ -365,14 +413,19 @@ class EndMatch(TableState):
 
         })
 
+        logger.info(f"A partida acabou! Placar final:")
+        for time, pontos in table.score.items():
+            logger.info(f"  Time {time}: {pontos} ponto(s).")
+
         await table.stop()
 
 
 class TableAgent(Agent):
-    def __init__(self, jid: JID, password: str, board: JID, players: list[JID], seed: int | None = None):
+    """Everything the table knows about the match lives here; the states read and write it."""
+
+    def __init__(self, jid: JID, password: str, board: JID, players: list[JID], seed: int | None = None, recorder: MetricsRecorder | None = None):
         super().__init__(str(jid), password)
-        # Information board: everything the table knows lives here, and the states read/write it
-        self.board = board
+        self.board = board  # JID of the blackboard agent
         self.players = players  # seat order: A, B, A, B
         self.rng = random.Random(seed)
         self.score: dict[TEAM, int] = {team: 0 for team in TEAMS}
@@ -385,6 +438,20 @@ class TableAgent(Agent):
         self.bet = Bet(players)
         self.answering = self.opener  # who must answer the current call
         self.fold_result: tuple[TEAM, int] | None = None  # set when a point ends by folding
+        self.strikes = 0  # failures in a row of the player the table is waiting for
+        self.recorder = recorder
+
+    def record(self, event: str, player: JID | None, value: object, bet: int | None) -> None:
+        """Writes one line of metrics, when this match is being measured."""
+        if self.recorder is not None:
+            self.recorder.event(
+                self.point_number,
+                None if self.point.finished else self.point.current_round,  # finished: no round in play
+                event,
+                player,
+                value,
+                bet
+            )
 
     def next_seat(self, player: JID) -> JID:
         """Next seat in play order."""
@@ -408,9 +475,8 @@ class TableAgent(Agent):
         flow.add_state(TablePhase.END_POINT, EndPoint())
         flow.add_state(TablePhase.END_MATCH, EndMatch())
 
-        # Possoble transitions between states
+        # Possible transitions between states
         flow.add_transition(TablePhase.START_POINT, TablePhase.PLAYER_TALK)
-        flow.add_transition(TablePhase.PLAYER_TALK, TablePhase.PLAYER_TALK)
         flow.add_transition(TablePhase.PLAYER_TALK, TablePhase.TURN)
         flow.add_transition(TablePhase.TURN, TablePhase.TURN)
         flow.add_transition(TablePhase.TURN, TablePhase.END_ROUND)

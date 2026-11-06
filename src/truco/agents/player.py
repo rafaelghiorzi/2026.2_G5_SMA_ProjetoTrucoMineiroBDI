@@ -1,17 +1,17 @@
-"""Players of the match (Specification 4 and 5; How the Agents Decide 3 and 4).
+"""Players of the match.
 
-Player is the agent: who it is, where it sits, and what it believes. How it plays
-is a behaviour plugged into it:
+Player is the agent: who it is, where it sits and what it believes. How it plays is
+a behaviour plugged into it:
 
-    Player("p1@localhost", ..., behaviour=Grinder())
+    Player(jid, password, team, table, board, partner, opponents, Grinder())
 
-TrucoBehaviour is the generic behaviour: it reacts to every event from the table,
-keeps the player's beliefs up to date and runs the decision recipe shared by
-everyone. The rules that change from one personality to another are abstract
-methods, implemented by the four personalities at the end of this file.
+TrucoBehaviour reacts to every message, keeps the beliefs up to date and runs the
+decision recipe shared by everyone. What changes from one personality to another is
+implemented by the four classes at the end of this file. See also agents/control.py.
 """
 
 import random
+import asyncio
 from abc import abstractmethod
 from collections import Counter
 from collections.abc import Awaitable, Callable
@@ -23,7 +23,7 @@ from spade.agent import Agent
 from spade.behaviour import CyclicBehaviour
 
 from truco import config
-from truco.communication import create_message, game_template, read_message
+from truco.communication import create_message, game_template, read_message, LoggedSend
 from truco.config import (
     ADVANTAGE_WEIGHT_IN_THRESHOLDS,
     BET_LEVELS,
@@ -45,6 +45,7 @@ from truco.config import (
     ROUND_BALANCE_WEIGHT,
     TEAM,
     TURN_TIMEOUT,
+    THINK_TIME,
     Category,
     Event,
     Performative,
@@ -56,7 +57,10 @@ from truco.config import (
 )
 from truco.game import Card, Deck, Hand, category_of
 
-# The 29 cards, counted by rank (there are 4 queens, 2 jokers...)
+import logging
+logger = logging.getLogger("truco.player")
+
+# The 29 cards, counted by rank
 FULL_DECK: Counter[Card] = Counter(Deck().cards)
 
 
@@ -78,8 +82,9 @@ class Announcement:
 # ============================================================================
 
 
-class TrucoBehaviour(CyclicBehaviour):
-    """Reconsideration on events (Specification 4.3): the player only acts when a message arrives.
+class TrucoBehaviour(LoggedSend, CyclicBehaviour):
+    """
+    The player only acts when a message arrives.
 
     Every message goes to the handler of its event. Notices only update the
     beliefs; requests (YOUR_TURN, ASK_DECLARATION, ASK_RESPONSE, TALK_WINDOW) also
@@ -89,10 +94,20 @@ class TrucoBehaviour(CyclicBehaviour):
     agent: "Player"
     personality: Personality  # each personality defines it
 
-    def __init__(self, rng: random.Random | None = None) -> None:
-        """`rng` lets the simulations fix a seed; without it, a fresh generator is used."""
+    def __init__(self, rng: random.Random | None = None,
+                 think_time: tuple[float, float] | None = THINK_TIME) -> None:
+        """`rng` fixes the decisions; `think_time` is the delay in seconds (None = no delay)."""
         super().__init__()
         self.rng = rng or random.Random()
+        self.think_time = think_time
+        self.think_rng = random.Random()  # separate: the delay must not change any decision
+
+    async def think(self) -> None:
+        """
+        Pretends to think before answering a request. The other agents keep running meanwhile.
+        """
+        if self.think_time is not None:
+            await asyncio.sleep(self.think_rng.uniform(*self.think_time))
 
     async def run(self) -> None:
         # In SPADE, receive() without a timeout returns at once; with one, it waits for a message
@@ -101,9 +116,13 @@ class TrucoBehaviour(CyclicBehaviour):
             return
         event, data = read_message(msg)
         handler = self.handlers.get(event)
-        if handler is not None:
+        if handler is None:
+            return
+        try:
             await handler(data)
-
+        except Exception:
+            logger.exception(f"{self.agent.me} falhou o handling: {event}")
+        
     @property
     def handlers(self) -> dict[Event, Callable[[dict], Awaitable[None]]]:
         return {
@@ -141,7 +160,7 @@ class TrucoBehaviour(CyclicBehaviour):
             self.agent.hand.remove(card)
 
     async def on_call(self, data: dict) -> None:
-        """Calling truco counts as announcing a medium hand"""
+        """A call or raise counts as announcing a medium hand."""
         self.agent.announcements[JID(data["player"])] = Announcement(CALL_ANNOUNCES, Source.CALL)
 
     async def on_declaration(self, data: dict) -> None:
@@ -167,19 +186,33 @@ class TrucoBehaviour(CyclicBehaviour):
         await self.agent.stop()
 
     async def on_reading(self, data: dict) -> None:
-        """Signals the board delivered: {"point", "signals": [{"from": jid, "value": category}], "my_action": TalkAction}."""
-         # TODO: turn each signal into an announcement about signal["from"] (Specification 6.2).
-        # - From my partner: Source.PARTNER_SIGNAL. It always arrives; attentive=False if my
-        #   action this point was not LISTEN (×0.7, 3.7).
-        # - From an opponent (only when my SPY succeeded): Source.SPIED_SIGNAL. It may be a bluff.
-        # - Ignore it if data["point"] is not the current point (a late message).
-        raise NotImplementedError
+        """Turns the signals the board delivered into announcements about whoever sent them.
 
-    # --- Requests: decide and answer (Specification 4.4) ---
+        data: {"point", "signals": [{"from": jid, "value": category}], "my_action": TalkAction}
+        """
+        if data["point"] != self.agent.point_number:
+            return # Late message from a point that is already over
+
+        listening = TalkAction(data["my_action"]) == TalkAction.LISTEN
+        for signal in data["signals"]:
+            sender = JID(signal["from"])
+            category = Category(signal["value"])
+            if sender == self.agent.partner:
+                # The partner's signal always arrives; not listening only lowers the trust
+                announcement = Announcement(category, Source.PARTNER_SIGNAL, attentive=listening)
+            else:
+                # Only a successful SPY gets here, but it may be a bluff
+                announcement = Announcement(category, Source.SPIED_SIGNAL)
+            self.agent.announcements[sender] = announcement
+
+    # --- Requests: decide and answer ---
 
     async def on_your_turn(self, data: dict) -> None:
         """Either call truco or play a card. If the call is accepted, the table sends
-        YOUR_TURN again (Specification 2.4, rule 8) and this runs once more."""
+        YOUR_TURN again and this runs once more."""
+
+        await self.think()
+
         table = self.agent.table
         if data["can_call"] and self.should_call():
             await self.tell(table, Performative.PROPOSE, {"event": Event.CALL})
@@ -188,6 +221,8 @@ class TrucoBehaviour(CyclicBehaviour):
         await self.tell(table, Performative.INFORM, {"event": Event.CARD_PLAYED, "card": card.rank})
 
     async def on_ask_declaration(self, data: dict) -> None:
+        await self.think()
+
         await self.tell(
             self.agent.table,
             Performative.INFORM,
@@ -195,6 +230,8 @@ class TrucoBehaviour(CyclicBehaviour):
         )
 
     async def on_ask_response(self, data: dict) -> None:
+        await self.think()
+
         response = self.answer_call(data["value"])
         performative = {
             Response.FOLD: Performative.REJECT,
@@ -204,7 +241,12 @@ class TrucoBehaviour(CyclicBehaviour):
         await self.tell(self.agent.table, performative, {"event": Event.RESPONSE, "response": response})
 
     async def on_talk_window(self, data: dict) -> None:
-        """One talk action per point, declared to the board (Specification 6.2)."""
+        """Chooses one talk action for the point and declares it to the board.
+
+        A failed SPY is declared as NOTHING: the board only knows about the ones that worked.
+        """
+
+        await self.think()
         action = self.talk()
         value = None
 
@@ -230,38 +272,33 @@ class TrucoBehaviour(CyclicBehaviour):
             }
         )
 
-        reply = await self.receive(timeout=TURN_TIMEOUT)
-        accepted = reply is not None and reply.get_metadata("performative") == Performative.ACCEPT
-        if accepted and action == TalkAction.SEND:
-            self.agent.sent_this_point = True
-
         return None
 
-    # --- Shared recipe (How the Agents Decide 3.2–3.5, summary in Appendix A) ---
+    # --- Shared recipe ---
 
     def unseen_cards(self) -> list[Card]:
-        """The deck minus my cards and every card already played (3.3)."""
+        """The deck minus my cards and every card already played."""
         seen = Counter(self.agent.hand)
         for cards in self.agent.played.values():
             seen.update(cards)
         return list((FULL_DECK - seen).elements())
 
     def advantage(self) -> float:
-        """(our points − their points) / 12, from −1 to +1 (3.4)."""
+        """(our points − their points) / 12, from −1 to +1."""
         return (self.agent.score_ours - self.agent.score_theirs) / POINTS_TO_WIN
 
     def round_balance(self) -> int:
-        """Rounds my team won in this point minus rounds it lost. Ties count 0 (3.4)."""
+        """Rounds my team won in this point minus rounds it lost. Ties count 0."""
         return self.agent.rounds.count(True) - self.agent.rounds.count(False)
 
     def hand_strength(self) -> float:
-        """With no cards left, my last card played is the one still disputing this round (3.2)."""
+        """With no cards left, my last card played is the one still disputing this round."""
         if len(self.agent.hand) > 0:
             return self.agent.hand.strength
         return self.agent.played[self.agent.me][-1].power
 
     def belief_about(self, player: JID) -> float:
-        """Neutral guess -> + bias -> mixed with announcements according to trust (3.3)."""
+        """Neutral guess -> + bias -> mixed with announcements according to trust."""
         # 1. Neutral guess: mean power of the cards I have not seen
         neutral = mean(card.power for card in self.unseen_cards())
 
@@ -283,11 +320,11 @@ class TrucoBehaviour(CyclicBehaviour):
         return (sum(card.power for card in played) + remaining * value) / CARDS_PER_HAND
 
     def threat(self) -> float:
-        """Mean of the beliefs about the two opponents (3.4)."""
+        """Mean of the beliefs about the two opponents."""
         return mean(self.belief_about(opponent) for opponent in self.agent.opponents)
 
     def win_chance(self) -> float:
-        """Chance of winning the point, without the Maverick's fold bonus (3.4)."""
+        """Chance of winning the point, without the Maverick's fold bonus."""
         p = self.personality.score_weight
         team_strength = (
             OWN_HAND_WEIGHT * self.hand_strength()
@@ -302,7 +339,7 @@ class TrucoBehaviour(CyclicBehaviour):
         return clip(chance, 0.0, 1.0)
 
     def fold_threshold(self, value_called: int) -> float:
-        """Below this chance, folding is worth more than accepting (3.5)."""
+        """Below this chance, folding is worth more than accepting."""
         return (
             BREAK_EVEN[value_called]
             + self.personality.caution
@@ -310,13 +347,13 @@ class TrucoBehaviour(CyclicBehaviour):
         )
 
     def raise_threshold(self) -> float:
-        """Above this chance, call truco or raise (3.5)."""
+        """Above this chance, call truco or raise."""
         return self.personality.raise_base + ADVANTAGE_WEIGHT_IN_THRESHOLDS * self.advantage()
 
-    # --- Decisions (Specification 4.4). Same rule for every personality. ---
+    # --- Decisions. Same rule for every personality. ---
 
     def should_call(self) -> bool:
-        """Call truco if the chance of winning the point is above the threshold (3.5)."""
+        """Call truco if the chance of winning the point is above the threshold."""
         return self.win_chance() + self.call_bonus() > self.raise_threshold()   
 
     def answer_call(self, value_called: int) -> Response:
@@ -342,7 +379,7 @@ class TrucoBehaviour(CyclicBehaviour):
         }
 
     def choose_card(self) -> Card:
-        """Which card to play (Specification 4.5; How the Agents Decide 3.6)."""
+        """Which card to play."""
         hand = self.agent.hand
         # last card available
         if len(hand) == 1:
@@ -365,34 +402,32 @@ class TrucoBehaviour(CyclicBehaviour):
         return hand.weakest_that_beats(highest) or hand.weakest()
 
     def declare(self) -> Category:
+        """Public declarations are always true."""
         return category_of(self.hand_strength())
 
     def talk(self) -> TalkAction:
-        """Draw from the personality's talk table after the common-sense rules (3.7)."""
+        """Draws from the personality's talk table, after adjusting it for a strong hand."""
         weights = dict(self.personality.talk)  # a copy: the personality's table is shared
-        has_cards = len(self.agent.hand) > 0
 
         # With a strong hand, the weight of BLUFF moves to SEND (bluffing only makes sense without a hand)
-        if has_cards and self.agent.hand.category == Category.STRONG:
+        if self.agent.hand.category == Category.STRONG:
             weights[TalkAction.SEND] += weights.pop(TalkAction.BLUFF)
-        # Whoever already sent this point, or has no cards, cannot SEND
-        if self.agent.sent_this_point or not has_cards:
-            weights.pop(TalkAction.SEND, None)
-        # Whoever has no cards cannot BLUFF either
-        if not has_cards:
-            weights.pop(TalkAction.BLUFF, None)
 
         actions = list(weights)
         return self.rng.choices(actions, weights=[weights[action] for action in actions])[0]
 
     def draw_opening(self) -> Card:
-        """Draw with the personality's opening table (3.6). With 2 cards there is no "medium"."""
+        """Draw with the personality's opening table. With 2 cards there is no "medium"."""
         cards = sorted(self.agent.hand, key=lambda card: card.position)  # weak -> strong
         if len(cards) == 3:
             w = self.personality.opening_3
+            if w is None:
+                raise ValueError("weights are non-existent")
             options, weights = [cards[2], cards[1], cards[0]], [w.strong, w.medium, w.weak]
         else:
             w = self.personality.opening_2
+            if w is None:
+                raise ValueError("weights are non-existent")
             options, weights = [cards[-1], cards[0]], [w.strong, w.weak]
         return self.rng.choices(options, weights=weights)[0]
 
@@ -401,26 +436,26 @@ class TrucoBehaviour(CyclicBehaviour):
 
     @abstractmethod
     def bias(self, player: JID) -> float:
-        """How much I shift my guess about `player` (3.3)."""
+        """How much I shift my guess about `player`."""
 
     @abstractmethod
     def trust(self, speaker: JID, category: Category, source: Source) -> float:
-        """How much I believe an announcement about `speaker` (3.3).
+        """How much I believe an announcement about `speaker`.
 
         The ×0.7 for whoever did not choose "listen" is applied by belief_about, on top
         of this value."""
 
     @abstractmethod
     def call_bonus(self) -> float:
-        """Added to the chance only for calling/raising, never for folding (3.4)."""
+        """Added to the chance only for calling/raising, never for folding."""
 
     @abstractmethod
     def open_round(self) -> Card:
-        """Which card to open the round with (3.6)."""
+        """Which card to open the round with."""
 
 
 # ============================================================================
-# Personalities (How the Agents Decide)
+# Personalities
 # ============================================================================
 
 
@@ -450,7 +485,7 @@ class RationalShark(TrucoBehaviour):
 class MaverickBluffer(TrucoBehaviour):
     personality = config.MAVERICK_BLUFFER
 
-    # Against control players the rate is fixed at the neutral value (3.4): a Coward
+    # Against control players the rate is fixed at the neutral value: a Coward
     # folds every time and would give a bonus that is not skill.
     opponents_are_control: bool = False
 
@@ -523,7 +558,7 @@ class Grinder(TrucoBehaviour):
 
 
 class Player(Agent):
-    """Who the player is and what it believes (Specification 4.1). How it plays is the
+    """Who the player is and what it believes. How it plays is the
     behaviour it receives."""
 
     def __init__(
@@ -537,9 +572,9 @@ class Player(Agent):
         opponents: list[JID],
         behaviour: TrucoBehaviour,
     ) -> None:
-        """`opponents[0]` must be the one who plays right after me: he answers my calls."""
+        """`opponents[0]` must be the one who plays right after me: they answer my calls."""
         super().__init__(str(jid), password)
-        self.team = team
+        self.team: TEAM = team
         self.table = table
         self.board = board
         self.point_number = 0  # which point is being played, as told by the table
@@ -554,7 +589,6 @@ class Player(Agent):
         self.played: dict[JID, list[Card]] = {}  # cards each player put on the table this point
         self.announcements: dict[JID, Announcement] = {}  # the latest one about each player
         self.rounds: list[bool | None] = []  # this point, from my side: won, lost, None = tie
-        self.sent_this_point = False  # TalkAction is allowed once per point (3.7)
         self.score_ours = 0
         self.score_theirs = 0
         # Fold history: the only memory that survives from one point to the next
@@ -574,7 +608,6 @@ class Player(Agent):
         self.played = {player: [] for player in self.everyone}
         self.announcements = {}
         self.rounds = []
-        self.sent_this_point = False
 
     def record_score(self, score: dict[TEAM, int]) -> None:
         self.score_ours = score[self.team]

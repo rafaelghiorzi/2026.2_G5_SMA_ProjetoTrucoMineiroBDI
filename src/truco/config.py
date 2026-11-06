@@ -1,7 +1,7 @@
 """Central configuration: every piece of data the game and the agents use lives here.
 
 This module imports nothing from the project or from SPADE, so any file can
-import it without creating cycles. Sections follow the documents in docs/.
+import it without creating cycles.
 """
 
 from dataclasses import dataclass
@@ -13,17 +13,23 @@ from typing import Literal, NamedTuple
 # System
 # ============================================================================
 
+MATCH_LOG_DIR = "match_logs"  # one log file per match
+RESULTS_FILE = "results/events.csv"  # metrics of the measured matches
+MAX_RETRIES = 3  # failures in a row before the table decides for a player
+THINK_TIME: tuple[float, float] | None = (1.0, 3.0)  # seconds a player "thinks"; None = no delay
+SEED = 67  # the same seed repeats the deals and the players' draws
+
 # SPADE's embedded XMPP server
 XMPP_DOMAIN = "localhost"
 AGENT_PASSWORD = "truco"
 
 ONTOLOGY = "truco-mineiro"
-TALK_TIMEOUT = 15  # seconds waiting for a play before asking again
+TALK_TIMEOUT = 15  # seconds the talk window stays open before the table asks the board to close it
 TURN_TIMEOUT = 15  # seconds waiting for a play before asking again
 
 
 # ============================================================================
-# Cards (Specification 2.1)
+# Cards
 # ============================================================================
 
 class Rank(StrEnum):
@@ -63,12 +69,12 @@ CARDS: dict[Rank, CardInfo] = {
 
 MANILHA_POSITION = 8  # from position 8 up, the card is a manilha
 MAX_POSITION = max(info.position for info in CARDS.values())
-POWER_EXPONENT = 1.5  # power = (position / max) ** exponent (How the Agents Decide 3.1)
+POWER_EXPONENT = 1.5  # power = (position / max) ** exponent
 CARDS_PER_HAND = 3
 
 
 # ============================================================================
-# Teams, scoring and betting (Specification 2.4)
+# Teams, scoring and betting
 # ============================================================================
 
 TEAM = Literal["A", "B"]
@@ -80,7 +86,7 @@ MIN_ROUND_TO_CALL = 2
 
 
 # ============================================================================
-# Hand category (How the Agents Decide 3.2 and 3.3)
+# Hand category
 # ============================================================================
 
 class Category(StrEnum):
@@ -103,7 +109,7 @@ CATEGORY_VALUE: dict[Category, float] = {
 
 
 # ============================================================================
-# FIPA-ACL protocol (Specification 6)
+# FIPA-ACL protocol
 # ============================================================================
 
 class Performative(StrEnum):
@@ -115,7 +121,7 @@ class Performative(StrEnum):
 
 
 class Event(StrEnum):
-    """What flows between table and players. The ones that ask for an answer are marked."""
+    """Everything that flows between table, board and players. Comments mark what asks for an answer."""
 
     NEW_POINT = "new-point"
     YOUR_TURN = "your-turn"  # asks: a card, or a call when can_call is true
@@ -129,17 +135,18 @@ class Event(StrEnum):
     ROUND_END = "round-end"
     POINT_END = "point-end"
     MATCH_END = "match-end"
-    # table -> board asks AGREE or REFUSE; Performative: REQUEST; Payload: point, players (A,B,A,B)
-    # board -> table answer AGREE or REFUSE; Performative: REQUEST; Payload: point
-    OPEN = "open"           # table -> board: asks AGREE or REFUSE 
-    # player -> board asks AGREE or REFUSE; Performative: REQUEST; Payload: point, action, value
-    # board -> player answer AGREE or REFUSE; Performative: REQUEST; Payload: point
-    DECLARE = "declare"     # player -> board: asks AGREE or REFUSE
-    # board -> player; Performative: inform; Payload: point, { player : value } | {}
-    READING = "reading"    # board -> player: only for LISTEN and SPY
-    # board -> table: Performative: INFORM; Payload: point
-    CLOSED = "closed"  # board -> table
-    QUERY = "query"
+    # table -> board: REQUEST with point and players (A, B, A, B)
+    # board -> table: ACCEPT with point
+    OPEN = "open"
+    # player -> board: REQUEST with point, action and value
+    # board -> player: ACCEPT, or REJECT if the window is closed or the player already declared
+    DECLARE = "declare"
+    # board -> player: INFORM with point, signals and my_action. Sent to whoever heard a signal:
+    # from the partner's SEND, or from the opponents' SEND and BLUFF after a successful SPY
+    READING = "reading"
+    # board -> table: INFORM with point, once all four declared
+    # table -> board: REQUEST with point, at the deadline; the board answers ACCEPT
+    CLOSED = "closed"
 
 
 class Response(StrEnum):
@@ -157,7 +164,7 @@ class TalkAction(StrEnum):
 
 
 class Source(StrEnum):
-    """Where an announcement came from (How the Agents Decide 3.3: four sources)."""
+    """Where an announcement came from."""
 
     PARTNER_SIGNAL = "partner-signal"  # signal from my partner in the talk window
     SPIED_SIGNAL = "spied-signal"  # opponent's signal (or bluff) I intercepted
@@ -166,7 +173,7 @@ class Source(StrEnum):
 
 
 # ============================================================================
-# Table (Specification 3)
+# Table
 # ============================================================================
 
 class TablePhase(StrEnum):
@@ -183,19 +190,7 @@ class TablePhase(StrEnum):
 
 
 # ============================================================================
-# Board
-# ============================================================================
-
-class BoardPhase(StrEnum):
-    """Names of the states in the table's state machine."""
-
-    INACTIVE = "INACTIVE"
-    OPEN = "OPEN"
-    PROCESSING = "PROCESSING"
-
-
-# ============================================================================
-# Decision recipe, the same for everyone (How the Agents Decide 3 and Appendix A)
+# Decision recipe, the same for everyone
 # ============================================================================
 
 # team_strength = OWN_HAND_WEIGHT × hand_strength + (1 − OWN_HAND_WEIGHT) × partner_belief
@@ -209,7 +204,7 @@ ROUND_BALANCE_WEIGHT = 0.15
 # Added to both thresholds: when ahead on the score, play more conservatively
 ADVANTAGE_WEIGHT_IN_THRESHOLDS = 0.08
 
-# Minimum chance for accepting to be worth more than folding, per value called (3.5)
+# Minimum chance for accepting to be worth more than folding, per value called
 BREAK_EVEN: dict[int, float] = {3: 0.333, 6: 0.250, 9: 0.167, 12: 0.125}
 
 # Bounds of the guess about another player's hand (the queen's power up to the max)
@@ -217,11 +212,11 @@ MIN_GUESS = 0.027
 MAX_GUESS = 1.0
 
 NOT_LISTENING_FACTOR = 0.7  # trust in the partner for whoever did not choose "listen"
-CALL_ANNOUNCES = Category.MEDIUM  # calling truco counts as announcing this (Specification 6.4)
+CALL_ANNOUNCES = Category.MEDIUM  # calling truco counts as announcing this
 
 
 # ============================================================================
-# Special personality rules (How the Agents Decide 3.3, 3.4 and 4)
+# Special personality rules
 # ============================================================================
 
 LOOSE_CANNON_BIAS_PER_ADVANTAGE = -0.20  # bias about opponents = this × advantage
@@ -234,7 +229,7 @@ FOLD_BONUS_INITIAL_CALLS = 2
 
 
 # ============================================================================
-# Personalities (How the Agents Decide 4)
+# Personalities
 # ============================================================================
 
 class OpeningWeights(NamedTuple):
