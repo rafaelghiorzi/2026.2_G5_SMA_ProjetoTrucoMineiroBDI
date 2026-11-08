@@ -110,6 +110,13 @@ class ListenAndRecord(LoggedSend, CyclicBehaviour):
                         "my_action": declarations[player]["action"]
                     },
                 ))
+
+        if self.agent.spectator is not None:
+            await self.send(create_message(self.agent.spectator, Performative.INFORM, {
+                "event": Event.TALK_LOG,
+                "point": point,
+                "declarations": {str(p): d for p, d in declarations.items()},
+            }))
         logger.info(f"Janela de conversa fechada no ponto {point}")
 
     def signals(self, declarations: dict, targets: list[JID], actions: set[TalkAction]) -> list[dict]:
@@ -125,10 +132,11 @@ class ListenAndRecord(LoggedSend, CyclicBehaviour):
 class BlackboardAgent(Agent):
     """Holds the talk windows, one per point."""
 
-    def __init__(self, jid: JID, password: str, table: JID, recorder: MetricsRecorder | None = None) -> None:
+    def __init__(self, jid: JID, password: str, table: JID, recorder: MetricsRecorder | None = None, spectator: JID | None = None) -> None:
         super().__init__(str(jid), password)
         self.table = table
         self.recorder = recorder
+        self.spectator = spectator
         self.talks: dict[int, dict] = {}  # point -> {"players", "declarations", "open"}
 
     async def setup(self) -> None:
