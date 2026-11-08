@@ -147,8 +147,6 @@ class Event(StrEnum):
     # board -> table: INFORM with point, once all four declared
     # table -> board: REQUEST with point, at the deadline; the board answers ACCEPT
     CLOSED = "closed"
-    TALK_LOG = "talk-log"   # board -> spectator: ações reais da janela de conversa
-    THOUGHT = "thought"     # player -> spectator: raciocínio por decisão
 
 
 class Response(StrEnum):

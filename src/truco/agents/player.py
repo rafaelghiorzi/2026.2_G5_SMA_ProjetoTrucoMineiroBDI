@@ -215,11 +215,9 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
 
         table = self.agent.table
         if data["can_call"] and self.should_call():
-            await self.trace("call")
             await self.tell(table, Performative.PROPOSE, {"event": Event.CALL})
             return
         card = self.choose_card()
-        await self.trace("play", card=card.rank)
         await self.tell(table, Performative.INFORM, {"event": Event.CARD_PLAYED, "card": card.rank})
 
     async def on_ask_declaration(self, data: dict) -> None:
@@ -240,8 +238,6 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
             Response.ACCEPT: Performative.ACCEPT,
             Response.RAISE: Performative.PROPOSE,
         }[response]
-        
-        await self.trace("respond", response=response, value=data["value"])
         await self.tell(self.agent.table, performative, {"event": Event.RESPONSE, "response": response})
 
     async def on_talk_window(self, data: dict) -> None:
@@ -435,32 +431,6 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
             options, weights = [cards[-1], cards[0]], [w.strong, w.weak]
         return self.rng.choices(options, weights=weights)[0]
 
-    def snapshot(self) -> dict:
-        """O raciocínio atual, para a interface. Não altera nenhum estado."""
-        others = [self.agent.partner, *self.agent.opponents]
-        return {
-            "win_chance": round(self.win_chance(), 3),
-            "threat": round(self.threat(), 3),
-            "raise_threshold": round(self.raise_threshold(), 3),
-            "advantage": round(self.advantage(), 3),
-            "beliefs": {str(p): round(self.belief_about(p), 3) for p in others},
-            "announcements": {
-                str(player): {"category": a.category, "source": a.source}
-                for player, a in self.agent.announcements.items()
-            },
-        }
-
-    async def trace(self, decision: str, **info) -> None:
-        if self.agent.spectator is None:
-            return
-        await self.tell(self.agent.spectator, Performative.INFORM, {
-            "event": Event.THOUGHT,
-            "player": self.agent.me,
-            "point": self.agent.point_number,
-            "decision": decision,
-            **self.snapshot(),
-            **info,
-        })
     # --- What changes with the personality ---
     # CyclicBehaviour already uses ABCMeta, so @abstractmethod is enforced here.
 
@@ -601,14 +571,12 @@ class Player(Agent):
         partner: JID,
         opponents: list[JID],
         behaviour: TrucoBehaviour,
-        spectator: JID | None = None
     ) -> None:
         """`opponents[0]` must be the one who plays right after me: they answer my calls."""
         super().__init__(str(jid), password)
         self.team: TEAM = team
         self.table = table
         self.board = board
-        self.spectator = spectator
         self.point_number = 0  # which point is being played, as told by the table
         self.me = JID(self.jid.bare)
         self.partner = partner

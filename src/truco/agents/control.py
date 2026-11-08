@@ -45,9 +45,6 @@ class ControlBehaviour(TrucoBehaviour):
     def open_round(self) -> Card:
         return self.choose_card()
 
-    def snapshot(self) -> dict:
-        return {}
-
 
 class Coward(ControlBehaviour):
     """Never calls, always folds, always plays the weakest card."""
