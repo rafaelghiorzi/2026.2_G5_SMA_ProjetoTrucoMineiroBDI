@@ -39,6 +39,9 @@ class TableState(LoggedSend, State):
 
     async def notify_all(self, content: dict) -> None:
         """Sends the same notice to the 4 players."""
+        if self.agent.spectator is not None:
+            await self.send(create_message(self.agent.spectator, Performative.INFORM, content))
+
         for player in self.agent.players:
             await self.send(create_message(player, Performative.INFORM, content))
 
@@ -111,6 +114,15 @@ class StartPoint(TableState):
                 "score": table.score,
             }
             await self.send(create_message(player, Performative.INFORM, content))
+
+        if table.spectator is not None:
+            await self.send(create_message(table.spectator, Performative.INFORM, {
+                "event": Event.NEW_POINT,
+                "point": table.point_number,
+                "hands": {str(player): [c.rank for c in hand] for player, hand in table.hands.items()},
+                "opener": table.opener,
+                "score": table.score,
+            }))
 
         logger.info(f"Inicio do ponto {table.point_number}. Cartas distribuidas")
 
@@ -423,10 +435,11 @@ class EndMatch(TableState):
 class TableAgent(Agent):
     """Everything the table knows about the match lives here; the states read and write it."""
 
-    def __init__(self, jid: JID, password: str, board: JID, players: list[JID], seed: int | None = None, recorder: MetricsRecorder | None = None):
+    def __init__(self, jid: JID, password: str, board: JID, players: list[JID], seed: int | None = None, recorder: MetricsRecorder | None = None, spectator: JID | None = None):
         super().__init__(str(jid), password)
         self.board = board  # JID of the blackboard agent
         self.players = players  # seat order: A, B, A, B
+        self.spectator = spectator
         self.rng = random.Random(seed)
         self.score: dict[TEAM, int] = {team: 0 for team in TEAMS}
         self.opener = players[0]  # P1 opens the first point
