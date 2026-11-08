@@ -21,6 +21,8 @@ async def play_match(
         think_time: tuple[float, float] | None = THINK_TIME,
         recorder: MetricsRecorder | None = None,
         save_log: bool = True,
+        spectator: JID | None = None,
+        on_setup=None
 ) -> dict[TEAM, int]:
     """
     Plays one match and returns the score.
@@ -49,14 +51,22 @@ async def play_match(
             jids[(i + 2) % 4],                       # partner
             [jids[(i + 1) % 4], jids[(i + 3) % 4]],  # whoever plays right after me comes first
             behaviour,
+            spectator=spectator
         ))
 
     if recorder is not None:
         recorder.start_match(seed, {jid: (lineup[i].__name__, teams[i]) for i, jid in enumerate(jids)})
     log = open_match_log(seed) if save_log else None
 
-    board = BlackboardAgent(board_jid, AGENT_PASSWORD, table_jid, recorder)
-    table = TableAgent(table_jid, AGENT_PASSWORD, board_jid, jids, seed, recorder)
+    board = BlackboardAgent(board_jid, AGENT_PASSWORD, table_jid, recorder, spectator=spectator)
+    table = TableAgent(table_jid, AGENT_PASSWORD, board_jid, jids, seed, recorder, spectator=spectator)
+
+    if on_setup is not None:
+        await on_setup({"seats": [
+            {"jid": str(j), "seat": SEATS[i], "team": teams[i], "personality": lineup[i].__name__}
+            for i, j in enumerate(jids)
+        ]})
+    
     for player in players:
         await player.start()
     await board.start()
