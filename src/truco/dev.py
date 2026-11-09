@@ -1,8 +1,8 @@
 """Development launchers exposed as `uv run` scripts (see [project.scripts] in pyproject.toml).
 
     uv run truco-serve  -> backend only (XMPP + agents + FastAPI on :8000)
-    uv run truco-web    -> frontend only (Vite dev server on :5173, proxies /ws and /match to :8000)
-    uv run truco-dev    -> both at once; Ctrl+C stops both
+    uv run truco-dev    -> backend + frontend (Vite on :5173, proxies /ws and /match to :8000);
+                           Ctrl+C stops both
 """
 
 import os
@@ -49,9 +49,9 @@ def _frontend_process() -> subprocess.Popen:
 
 
 def _backend_process() -> subprocess.Popen:
-    # `-m truco.serve` runs serve.py as __main__, so its `if __name__ == "__main__"` guard
+    # `-m truco.server` runs server.py as __main__, so its `if __name__ == "__main__"` guard
     # applies (without it the embedded XMPP server hangs at agent registration)
-    return _spawn([sys.executable, "-m", "truco.serve"])
+    return _spawn([sys.executable, "-m", "truco.server"])
 
 
 def _raise_interrupt(*_) -> None:
@@ -77,10 +77,6 @@ def _wait(*procs: subprocess.Popen) -> None:
                 p.wait(timeout=5)
             except subprocess.TimeoutExpired:
                 _stop(p, signal.SIGKILL)
-
-
-def web() -> None:
-    _wait(_frontend_process())
 
 
 def dev() -> None:

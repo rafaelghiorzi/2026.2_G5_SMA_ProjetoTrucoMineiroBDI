@@ -1,6 +1,6 @@
 """HTTP/WebSocket bridge between the spectator agent and the browser.
 
-Runs in the same asyncio loop as the SPADE agents (see serve.py).
+Entry point of the spectator: embedded XMPP server + agents + web server in one event loop.
 """
 
 import asyncio
@@ -9,6 +9,8 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, WebSocket, WebSocketDisconnect
 from pydantic import BaseModel
+import spade
+import uvicorn
 from slixmpp import JID
 
 from truco.agents.control import Coward, Madman
@@ -16,6 +18,7 @@ from truco.agents.player import Grinder, LooseCannon, MaverickBluffer, RationalS
 from truco.agents.spectator import SpectatorAgent
 from truco.config import AGENT_PASSWORD, THINK_TIME, XMPP_DOMAIN
 from truco.main import PERSONALITIES, play_match  # adjust the import if main.py lives elsewhere
+from truco.match_log import setup_console
 
 SPECTATOR_JID = JID(f"spectator@{XMPP_DOMAIN}")
 BEHAVIOURS = {c.__name__: c for c in [Grinder, MaverickBluffer, LooseCannon, RationalShark, Coward, Madman]}
@@ -98,3 +101,16 @@ async def ws(websocket: WebSocket) -> None:
         pass
     finally:
         hub.clients.discard(queue)
+
+
+async def main() -> None:
+    await uvicorn.Server(uvicorn.Config(app, host="127.0.0.1", port=8000)).serve()
+
+
+def run() -> None:
+    setup_console()
+    spade.run(main(), embedded_xmpp_server=True)
+
+
+if __name__ == "__main__":
+    run()
