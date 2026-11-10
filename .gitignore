@@ -5,3 +5,4 @@ TODO.md
 match_logs/
 results/
 node_modules/
+src/frontend/dist/

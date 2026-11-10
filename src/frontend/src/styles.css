@@ -1,7 +1,9 @@
+/* felt colour is read from the image itself, no overlay needed */
 :root {
   --floor: #24150c; --plank: #3a2314; --edge: #1a0e07; --paper: #f3ead2; --ink: #2b1b12;
   --red: #c8372d; --brass: #e0b04a; --teamA: #6fd0b8; --teamB: #f0a24a;
   --felt-mat: #0e6226; /* tune to match the table in the image */
+  --num: "Atkinson Hyperlegible Mono", ui-monospace, monospace; /* digits are hard to read in Pixelify Sans */
   --pixel: "Pixelify Sans", ui-monospace, "Courier New", monospace;
 }
 * { box-sizing: border-box; }
@@ -20,35 +22,38 @@ header { display: flex; flex-wrap: wrap; gap: 1rem 2rem; align-items: center; ju
 .controls { display: flex; gap: .5rem; flex-wrap: wrap; }
 .empty, .error { padding: 2rem 1.5rem; } .error { color: #ff9a8f; }
 
-main { display: grid; grid-template-columns: minmax(0, 1fr) 19rem; gap: 1.2rem; padding: 1.2rem 1.5rem; align-items: start; }
+main { padding: .6rem; }
 
 /* Scene: the image plus everything laid over it, positioned in % (see SPOT in App.jsx) */
-.scene { position: relative; container-type: inline-size; border: 4px solid var(--edge); box-shadow: 0 6px 0 #0008; line-height: 0; }
+.scene { width: min(100%, calc((100vh - 5.5rem) * 1.812)); margin: 0 auto; position: relative; container-type: inline-size; border: 4px solid var(--edge); box-shadow: 0 6px 0 #0008; line-height: 0; }
 .scene > * { position: absolute; transform: translate(-50%, -50%); line-height: 1.3; }
 .scene > img.bg { position: static; transform: none; width: 100%; height: auto; display: block; image-rendering: pixelated; }
-.mat { left: 50%; top: 52.8%; width: 17.9%; height: 19.3%; background: var(--felt-mat); border-radius: 50%; box-shadow: 0 0 1cqw .8cqw var(--felt-mat); }
 
-.tag { font-size: clamp(10px, 1.35cqw, 15px); background: var(--ink); border: 2px solid var(--team); padding: .1em .6em; white-space: nowrap; }
-.bubble { font-size: clamp(11px, 1.8cqw, 19px); font-weight: 700; background: #fffbe9; color: var(--ink); border: 2px solid var(--ink); box-shadow: 3px 3px 0 #0006; padding: .15em .6em; white-space: nowrap; animation: pop .25s steps(3) both; }
+.bubble { position: absolute; left: 50%; translate: -50% 0; z-index: 2; font-size: clamp(11px, 1.8cqw, 19px); font-weight: 700; background: #fffbe9; color: var(--ink); border: 3px solid var(--team); box-shadow: 3px 3px 0 #0006; padding: .15em .6em; white-space: nowrap; animation: pop .25s steps(3) both; }
+.bubble.below { top: 100%; margin-top: .5em; }
+.bubble.above { bottom: 100%; margin-bottom: .5em; }
 @keyframes pop { from { scale: .6; } to { scale: 1; } }
 
 
-aside { background: var(--plank); border: 4px solid var(--edge); padding: .8rem 1rem; max-height: 85vh; overflow-y: auto; display: grid; gap: .7rem; }
-aside h2 { margin: .3rem 0 0; font-size: 1.1rem; color: var(--brass); }
 .toggle { font-size: .9rem; display: flex; gap: .5rem; align-items: center; }
-.mind { border-left: 4px solid var(--team); padding-left: .6rem; display: grid; gap: .3rem; }
-.mind h3 { margin: 0; font-size: 1rem; } .mind h3 span { font-weight: 400; opacity: .7; margin-left: .4rem; }
-.hand { display: flex; gap: .3rem; }
-.talk { margin: 0; font-size: .8rem; } .talk em { font-style: normal; border: 1px solid var(--paper); padding: 0 .4rem; }
+.mind { font-size: clamp(9px, .95cqw, 14px); background: #2b1b12ee; border: 2px solid var(--team); padding: .5em .7em; display: grid; gap: .3em; }
+.tag { font-family: var(--num); font-weight: 700; font-size: clamp(11px, 1.6cqw, 18px); background: var(--ink); border: 2px solid var(--team); color: var(--team); padding: .05em .5em; white-space: nowrap; }
+/* only the numbers use the readable face; the rest of the text stays in Pixelify Sans */
+.row strong, .plaque strong, .meta, .seat { font-family: var(--num); font-weight: 700; font-variant-numeric: tabular-nums; }
+.scene > .mind { transform: none; width: max-content; min-width: 20cqw; }
+.mind h3 { margin: 0; white-space: nowrap; font-size: 1.15em; color: var(--team); } .mind h3 span { font-weight: 400; color: var(--paper); opacity: .7; margin-left: .4rem; }
+.talk { margin: 0; font-size: .85em; } .talk em { font-style: normal; border: 1px solid var(--paper); padding: 0 .4rem; }
 .talk .bluff { border-color: var(--red); color: #ff9a8f; } .talk .spy { border-color: var(--brass); color: var(--brass); }
-.thought { display: grid; gap: .25rem; } .thought small { font-size: .75rem; opacity: .9; }
-.bar { position: relative; height: 8px; background: var(--ink); border: 1px solid var(--edge); }
-.bar i { position: absolute; inset: 0 auto 0 0; background: var(--teamA); }
+.thought { display: grid; gap: .25em; }
+.row { display: grid; grid-template-columns: max-content minmax(4em, 1fr) 2.7em; align-items: center; gap: .5em; font-size: 1em; white-space: nowrap; }
+.row strong { text-align: right; font-variant-numeric: tabular-nums; }
+.chance strong { color: var(--team); }
+.thought .what, .wait { margin: 0; font-size: .85em; opacity: .8; }
+.bar u { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--paper); opacity: .35; }
+.bar { position: relative; height: .7em; background: var(--floor); border: 1px solid var(--edge); }
+.bar i { position: absolute; inset: 0 auto 0 0; background: var(--team); }
 .bar b { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--brass); }
-aside ol { list-style: none; margin: 0; padding: 0; display: grid; gap: .3rem; font-size: .85rem; }
-aside li:first-child { color: var(--brass); }
 
-@media (max-width: 960px) { main { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .scene .card, .bubble { animation: none; } }
 
 
@@ -56,10 +61,23 @@ aside li:first-child { color: var(--brass); }
 .card { display: inline-grid; place-items: center; width: 2.6rem; aspect-ratio: 68 / 98; }
 .card.back { background: repeating-linear-gradient(45deg, #b3342b 0 3px, #8f2620 3px 6px); border: 2px solid var(--paper); box-shadow: 0 0 0 2px var(--ink); }
 .card.joker { background: var(--paper); border: 2px solid var(--ink); color: var(--red); font-weight: 700; font-size: clamp(7px, 1cqw, 11px); }
-.scene > .card { width: 3.8cqw; animation: drop .28s steps(4) both; }
-.card.bottom { --dx: 0px; --dy: 40px; } .card.top { --dx: 0px; --dy: -40px; } .card.left { --dx: -40px; --dy: 0px; } .card.right { --dx: 40px; --dy: 0px; }
-@keyframes drop { from { transform: translate(-50%, -50%) translate(var(--dx), var(--dy)); } to { transform: translate(-50%, -50%); } }
-.hand-mat { width: 8.4cqw; height: 4.8cqw; background: var(--felt-mat); border-radius: 1cqw; box-shadow: 0 0 .7cqw .5cqw var(--felt-mat); }
+/* Played cards: each one is turned to face its player (the top of the card points away from them) */
+.scene > .card { width: 3.4cqw; --rot: 0deg; transform: translate(-50%, -50%) rotate(var(--rot)); animation: drop .28s steps(4) both; filter: drop-shadow(0 .15cqw 0 #0007); }
+.card.bottom { --dx: 0px; --dy: 40px; --rot: 0deg; }
+.card.top { --dx: 0px; --dy: -40px; --rot: 180deg; }
+.card.left { --dx: -40px; --dy: 0px; --rot: 90deg; }
+.card.right { --dx: 40px; --dy: 0px; --rot: -90deg; }
+@keyframes drop {
+  from { transform: translate(-50%, -50%) translate(var(--dx), var(--dy)) rotate(var(--rot)); }
+  to { transform: translate(-50%, -50%) rotate(var(--rot)); }
+}
+
+/* Hands: fanned on the felt in front of each player, turned to face them */
 .fan { display: flex; }
-.fan .card { width: 3.1cqw; margin: 0 -.8cqw; rotate: var(--r, 0deg); filter: drop-shadow(0 2px 0 #0008); }
-.fan .joker { font-size: clamp(6px, .8cqw, 9px); }
+.fan.bottom { transform: translate(-50%, -50%); }
+.fan.top { transform: translate(-50%, -50%) rotate(180deg); }
+.fan.left { transform: translate(-50%, -50%) rotate(90deg); }
+.fan.right { transform: translate(-50%, -50%) rotate(-90deg); }
+.fan .card { width: 2.8cqw; margin: 0 -.5cqw; rotate: var(--r, 0deg); filter: drop-shadow(0 .15cqw 0 #0008); }
+.fan .card.back { border-width: 1px; box-shadow: 0 0 0 1px var(--ink); }
+.fan .joker { font-size: clamp(5px, .7cqw, 8px); }

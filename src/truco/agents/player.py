@@ -437,13 +437,14 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
 
     def snapshot(self) -> dict:
         """O raciocínio atual, para a interface. Não altera nenhum estado."""
-        others = [self.agent.partner, *self.agent.opponents]
         return {
             "win_chance": round(self.win_chance(), 3),
+            "own_strength": round(self.hand_strength(), 3),
             "threat": round(self.threat(), 3),
             "raise_threshold": round(self.raise_threshold(), 3),
             "advantage": round(self.advantage(), 3),
-            "beliefs": {str(p): round(self.belief_about(p), 3) for p in others},
+            "beliefs_about_partner": {str(self.agent.partner): self.belief_about(self.agent.partner)},
+            "beliefs_about_opponents": {str(p): round(self.belief_about(p), 3) for p in self.agent.opponents},
             "announcements": {
                 str(player): {"category": a.category, "source": a.source}
                 for player, a in self.agent.announcements.items()
@@ -472,7 +473,7 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
     def trust(self, speaker: JID, category: Category, source: Source) -> float:
         """How much I believe an announcement about `speaker`.
 
-        The ×0.7 for whoever did not choose "listen" is applied by belief_about, on top
+        The x0.7 for whoever did not choose "listen" is applied by belief_about, on top
         of this value."""
 
     @abstractmethod
