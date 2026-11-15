@@ -5,7 +5,7 @@ description = "Truco Mineiro multi-agent system with BDI agents and FIPA-ACL"
 readme = "README.md"
 authors = [
     { name = "rafaelghiorzi", email = "rafael.ghiorzi@gmail.com" },
-    { name = "Lucas Saad Rodrigues", email = ""},
+    { name = "Lucas Saad Rodrigues", email = "lucassaadro@gmail.com"},
     { name = "Lucca Schoen de Almeida", email = ""}
 ]
 requires-python = ">=3.14"
