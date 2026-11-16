@@ -87,7 +87,7 @@ async def main() -> None:
     # await play_match([RationalShark, Coward, RationalShark, Coward], SEED, None, recorder)
     
     try:
-        await play_match([rng.choice(PERSONALITIES) for _ in SEATS], SEED, THINK_TIME, recorder)
+        await play_match([rng.choice(PERSONALITIES) for _ in SEATS], SEED, (0.0, 0.0), recorder)
     finally:
         recorder.close()  # even if the match fails, what was measured reaches the file
 

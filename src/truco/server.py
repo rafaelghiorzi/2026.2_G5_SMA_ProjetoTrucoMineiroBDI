@@ -16,7 +16,7 @@ from slixmpp import JID
 from truco.agents.control import Coward, Madman
 from truco.agents.player import Grinder, LooseCannon, MaverickBluffer, RationalShark
 from truco.agents.spectator import SpectatorAgent
-from truco.config import AGENT_PASSWORD, THINK_TIME, XMPP_DOMAIN
+from truco.config import AGENT_PASSWORD, THINK_TIME, XMPP_DOMAIN, SEED
 from truco.main import PERSONALITIES, play_match  # adjust the import if main.py lives elsewhere
 from truco.match_log import setup_console
 
@@ -58,7 +58,7 @@ app = FastAPI(lifespan=lifespan)
 
 class MatchRequest(BaseModel):
     lineup: list[str] | None = None  # 4 behaviour names, in seat order A1, B1, A2, B2
-    seed: int | None = None
+    seed: int | None = SEED
     fast: bool = False  # no thinking delay
 
 
@@ -77,7 +77,13 @@ async def start_match(req: MatchRequest = MatchRequest()):
     task = app.state.match
     if task is not None and not task.done():
         raise HTTPException(409, "Já existe uma partida em andamento.")
-    names = req.lineup or [random.choice(PERSONALITIES).__name__ for _ in range(4)]
+
+    if req.seed is not None:
+        generator = random.Random(req.seed)
+    else:
+        generator = random.Random()
+
+    names = req.lineup or [generator.choice(PERSONALITIES).__name__ for _ in range(4)]
     if len(names) != 4 or any(n not in BEHAVIOURS for n in names):
         raise HTTPException(422, f"lineup precisa de 4 nomes entre {list(BEHAVIOURS)}")
     hub.reset()
