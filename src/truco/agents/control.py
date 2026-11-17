@@ -7,7 +7,7 @@ protocol as everyone (TrucoBehaviour), but replace every decision that uses the 
 from slixmpp import JID
 
 from truco.agents.player import TrucoBehaviour
-from truco.config import Category, Event, Performative, Response, Source, TalkAction
+from truco.config import Category, Response, Source, TalkAction
 from truco.game import Card
 
 
@@ -16,16 +16,7 @@ class ControlBehaviour(TrucoBehaviour):
 
     async def on_talk_window(self, data: dict) -> None:
         """Does not take part, but says so: otherwise the window would wait for the deadline."""
-        await self.tell(
-            self.agent.board,
-            Performative.REQUEST,
-            {
-                "event": Event.DECLARE,
-                "point": self.agent.point_number,
-                "action": TalkAction.NOTHING,
-                "value": None,
-            },
-        )
+        await self.declare_talk(TalkAction.NOTHING, None)
 
     def declare(self) -> Category | None:
         return None  # the table treats a null category as "does not take part"

@@ -2,7 +2,9 @@
 // so pause, step and "live" are just a different cursor.
 
 export const CALL_NAMES = { 3: "truco", 6: "seis", 9: "nove", 12: "doze" };
-const CATEGORY = { weak: "fraca", medium: "média", strong: "forte" };
+export const BET_LEVELS = [1, 3, 6, 9, 12];
+export const nextLevel = (value) => BET_LEVELS[BET_LEVELS.indexOf(value) + 1];
+export const CATEGORY = { weak: "fraca", medium: "média", strong: "forte" };
 const ANSWER = { fold: "Corro!", accept: "Aceito!", raise: "Aumento!" };
 
 // The table only sends ranks, so suits are just art. Spread them so the same face
@@ -27,7 +29,9 @@ function deal(hands) {
 export const initial = {
   seats: [], names: {}, score: { A: 0, B: 0 }, point: 0,
   hands: {}, table: {}, tableSeq: {}, roundDone: false, rounds: [], bet: 1,
-  call: null, talk: null, decl: {}, thoughts: {}, bubbles: {}, log: [], over: false, error: null,
+  call: null, talk: null, decl: {}, thoughts: {}, bubbles: {}, log: [], over: false, error: null, seed: null,
+  // only when a person plays: what they are being asked, what they chose to say and what they heard
+  prompt: null, myTalk: null, heard: [],
 };
 
 export function step(s, ev) {
@@ -37,14 +41,24 @@ export function step(s, ev) {
 
   switch (ev.event) {
     case "match-config":
-      return { ...initial, seats: ev.seats, names: Object.fromEntries(ev.seats.map((x) => [x.jid, x.seat])) };
+      return { ...initial, seed: ev.seed, seats: ev.seats, names: Object.fromEntries(ev.seats.map((x) => [x.jid, x.seat])) };
     case "match-error":
       return { ...s, error: ev.message };
     case "new-point":
       return {
         ...s, point: ev.point, hands: deal(ev.hands), score: ev.score, table: {}, tableSeq: {}, roundDone: false,
-        rounds: [], bet: 1, call: null, talk: null, decl: {}, thoughts: {}, bubbles: {}, ...say(`Ponto ${ev.point} começou`),
+        rounds: [], bet: 1, call: null, talk: null, decl: {}, thoughts: {}, bubbles: {}, myTalk: null, heard: [],
+        ...say(`Ponto ${ev.point} começou`),
       };
+    // The prompt is not cleared on new-point: it comes straight from the server and may overtake the table's notices
+    case "prompt":
+      return { ...s, prompt: ev };
+    case "prompt-done":
+      return { ...s, prompt: null };
+    case "human-talk":
+      return { ...s, myTalk: ev };
+    case "human-reading":
+      return { ...s, heard: ev.signals };
     case "talk-log":
       return {
         ...s, talk: ev.declarations,

@@ -1,7 +1,9 @@
 """Entry point: sets up the agents and plays one match."""
 
-import spade
+import asyncio
 import random
+
+import spade
 from slixmpp import JID
 from truco.config import AGENT_PASSWORD, XMPP_DOMAIN, THINK_TIME, TEAMS, RESULTS_FILE, SEED, TEAM
 
@@ -10,13 +12,14 @@ from truco.metrics import MetricsRecorder
 from truco.agents.table import TableAgent
 from truco.agents.blackboard import BlackboardAgent
 from truco.agents.control import ControlBehaviour, Coward, Madman
+from truco.agents.human import Human
 from truco.agents.player import Player, LooseCannon, MaverickBluffer, Grinder, RationalShark, TrucoBehaviour
 
 SEATS = ["A1", "B1", "A2", "B2"]
 PERSONALITIES = [Grinder, MaverickBluffer, LooseCannon, RationalShark]
 
 async def play_match(
-        lineup: list[type[TrucoBehaviour]],
+        lineup: list[type[TrucoBehaviour] | TrucoBehaviour],
         seed: int | None = None,
         think_time: tuple[float, float] | None = THINK_TIME,
         recorder: MetricsRecorder | None = None,
@@ -27,13 +30,15 @@ async def play_match(
     """
     Plays one match and returns the score.
 
-    `lineup` has one behaviour class per seat, in SEATS order. The same `seed` repeats the
-    match for the same lineup. `think_time` is the players' delay (None = no delay),
+    `lineup` has one behaviour class per seat, in SEATS order, or an already built behaviour
+    (a Human, which needs the web server). The same `seed` repeats the match for the same lineup. `think_time` is the players' delay (None = no delay),
     `recorder` writes the metrics and `save_log` creates the file in match_logs/.
     """
 
+    kinds = [entry if isinstance(entry, type) else type(entry) for entry in lineup]
+
     # The name shows who sits where. XMPP normalizes it to lowercase: maverickbluffer_a1@localhost
-    jids = [JID(f"{lineup[i].__name__}_{seat}@{XMPP_DOMAIN}") for i, seat in enumerate(SEATS)]
+    jids = [JID(f"{kinds[i].__name__}_{seat}@{XMPP_DOMAIN}") for i, seat in enumerate(SEATS)]
     table_jid = JID(f"table@{XMPP_DOMAIN}")
     board_jid = JID(f"board@{XMPP_DOMAIN}")
     teams: list[TEAM] = [TEAMS[i % 2] for i in range(4)]
@@ -41,10 +46,15 @@ async def play_match(
     seeds = random.Random(seed)
     players: list[Player] = []
     for i, jid in enumerate(jids):
-        behaviour = lineup[i](rng=random.Random(seeds.randrange(2**32)), think_time=think_time)
+        rng = random.Random(seeds.randrange(2**32))
+        entry = lineup[i]
+        if isinstance(entry, TrucoBehaviour):
+            behaviour, behaviour.rng = entry, rng
+        else:
+            behaviour = entry(rng=rng, think_time=think_time)
         # Maverick's fold bonus stays neutral against control players
         if isinstance(behaviour, MaverickBluffer):
-            behaviour.opponents_are_control = issubclass(lineup[(i + 1) % 4], ControlBehaviour)
+            behaviour.opponents_are_control = issubclass(kinds[(i + 1) % 4], ControlBehaviour)
 
         players.append(Player(
             jid, AGENT_PASSWORD, teams[i], table_jid, board_jid,
@@ -55,27 +65,32 @@ async def play_match(
         ))
 
     if recorder is not None:
-        recorder.start_match(seed, {jid: (lineup[i].__name__, teams[i]) for i, jid in enumerate(jids)})
+        recorder.start_match(seed, {jid: (kinds[i].__name__, teams[i]) for i, jid in enumerate(jids)})
     log = open_match_log(seed) if save_log else None
 
     board = BlackboardAgent(board_jid, AGENT_PASSWORD, table_jid, recorder, spectator=spectator)
-    table = TableAgent(table_jid, AGENT_PASSWORD, board_jid, jids, seed, recorder, spectator=spectator)
+    humans = {jid for jid, kind in zip(jids, kinds) if issubclass(kind, Human)}
+    table = TableAgent(table_jid, AGENT_PASSWORD, board_jid, jids, seed, recorder, spectator=spectator, humans=humans)
 
     if on_setup is not None:
         await on_setup({"seats": [
-            {"jid": str(j), "seat": SEATS[i], "team": teams[i], "personality": lineup[i].__name__}
+            {"jid": str(j), "seat": SEATS[i], "team": teams[i], "personality": kinds[i].__name__,
+             "human": j in humans}
             for i, j in enumerate(jids)
         ]})
-    
-    for player in players:
-        await player.start()
-    await board.start()
-    await table.start()
 
-    await spade.wait_until_finished([table, *players])
-    await board.stop()
-    if log is not None:
-        close_match_log(log)
+    agents = [*players, board, table]
+    try:
+        # Each start registers and connects to the XMPP server: in parallel it takes the time of one.
+        # The table goes last, so everyone is already listening when it deals.
+        await asyncio.gather(*(agent.start() for agent in agents[:-1]))
+        await table.start()
+        await spade.wait_until_finished([table, *players])
+    finally:
+        # Also when the match is cancelled (a new one was asked for): the same JIDs come back
+        await asyncio.gather(*(agent.stop() for agent in agents if agent.is_alive()))
+        if log is not None:
+            close_match_log(log)
     return table.score
 
 async def main() -> None:
@@ -87,7 +102,7 @@ async def main() -> None:
     # await play_match([RationalShark, Coward, RationalShark, Coward], SEED, None, recorder)
     
     try:
-        await play_match([rng.choice(PERSONALITIES) for _ in SEATS], SEED, THINK_TIME, recorder)
+        await play_match([rng.choice(PERSONALITIES) for _ in SEATS], SEED, (0,0), recorder)
     finally:
         recorder.close()  # even if the match fails, what was measured reaches the file
 

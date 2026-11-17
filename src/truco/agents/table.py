@@ -18,6 +18,7 @@ from truco.config import (
     POINTS_TO_WIN,
     TEAM,
     TEAMS,
+    HUMAN_TIMEOUT,
     TURN_TIMEOUT,
     TALK_TIMEOUT,
     MAX_RETRIES,
@@ -154,7 +155,8 @@ class PlayerTalk(TableState):
         await self.notify_all({"event": Event.TALK_WINDOW, "point": table.point_number})
 
         # 3. Normal case: everyone declared and the board warns us before the deadline.
-        if await self.wait_for(table.board, Event.CLOSED, TALK_TIMEOUT) is not None:
+        deadline = HUMAN_TIMEOUT if table.humans else TALK_TIMEOUT
+        if await self.wait_for(table.board, Event.CLOSED, deadline) is not None:
             return
 
         # 4. Deadline: the board fills the missing players with NOTHING and delivers the signals.
@@ -186,7 +188,7 @@ class Turn(TableState):
         ))
 
         # 2. Wait for this player's answer. Messages from anyone else are discarded.
-        msg = await self.wait_from(table.turn)
+        msg = await self.wait_from(table.turn, table.timeout_for(table.turn))
 
         # 3. A truco call: announce it and go to the declarations.
         if msg is not None and can_call and read_message(msg)[0] == Event.CALL:
@@ -289,7 +291,7 @@ class AwaitAnswer(TableState):
         await self.send(create_message(
             table.answering, Performative.PROPOSE, {"event": Event.ASK_RESPONSE, "value": bet.pending},
         ))
-        data = await self.wait_for(table.answering, Event.RESPONSE)
+        data = await self.wait_for(table.answering, Event.RESPONSE, table.timeout_for(table.answering))
         response = self.valid_response(data)
         if response is None:
             table.strikes += 1
@@ -435,8 +437,9 @@ class EndMatch(TableState):
 class TableAgent(Agent):
     """Everything the table knows about the match lives here; the states read and write it."""
 
-    def __init__(self, jid: JID, password: str, board: JID, players: list[JID], seed: int | None = None, recorder: MetricsRecorder | None = None, spectator: JID | None = None):
+    def __init__(self, jid: JID, password: str, board: JID, players: list[JID], seed: int | None = None, recorder: MetricsRecorder | None = None, spectator: JID | None = None, humans: set[JID] | None = None):
         super().__init__(str(jid), password)
+        self.humans = humans or set()  # seats played by a person: the table waits longer for them
         self.board = board  # JID of the blackboard agent
         self.players = players  # seat order: A, B, A, B
         self.spectator = spectator
@@ -465,6 +468,9 @@ class TableAgent(Agent):
                 value,
                 bet
             )
+
+    def timeout_for(self, player: JID) -> float:
+        return HUMAN_TIMEOUT if player in self.humans else TURN_TIMEOUT
 
     def next_seat(self, player: JID) -> JID:
         """Next seat in play order."""

@@ -213,14 +213,10 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
 
         await self.think()
 
-        table = self.agent.table
         if data["can_call"] and self.should_call():
-            await self.trace("call")
-            await self.tell(table, Performative.PROPOSE, {"event": Event.CALL})
+            await self.call_truco()
             return
-        card = self.choose_card()
-        await self.trace("play", card=card.rank)
-        await self.tell(table, Performative.INFORM, {"event": Event.CARD_PLAYED, "card": card.rank})
+        await self.play_card(self.choose_card())
 
     async def on_ask_declaration(self, data: dict) -> None:
         await self.think()
@@ -233,15 +229,24 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
 
     async def on_ask_response(self, data: dict) -> None:
         await self.think()
+        await self.respond(self.answer_call(data["value"]), data["value"])
 
-        response = self.answer_call(data["value"])
+    async def call_truco(self) -> None:
+        await self.trace("call")
+        await self.tell(self.agent.table, Performative.PROPOSE, {"event": Event.CALL})
+
+    async def play_card(self, card: Card) -> None:
+        await self.trace("play", card=card.rank)
+        await self.tell(self.agent.table, Performative.INFORM, {"event": Event.CARD_PLAYED, "card": card.rank})
+
+    async def respond(self, response: Response, value_called: int) -> None:
         performative = {
             Response.FOLD: Performative.REJECT,
             Response.ACCEPT: Performative.ACCEPT,
             Response.RAISE: Performative.PROPOSE,
         }[response]
-        
-        await self.trace("respond", response=response, value=data["value"])
+
+        await self.trace("respond", response=response, value=value_called)
         await self.tell(self.agent.table, performative, {"event": Event.RESPONSE, "response": response})
 
     async def on_talk_window(self, data: dict) -> None:
@@ -261,10 +266,13 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
             case TalkAction.SEND:
                 value = self.agent.hand.category
             case TalkAction.BLUFF:
-                value = Category.STRONG
+                value = self.bluff_category()
             case _:
                 pass
 
+        await self.declare_talk(action, value)
+
+    async def declare_talk(self, action: TalkAction, value: Category | None) -> None:
         await self.tell(
             recipient=self.agent.board,
             performative=Performative.REQUEST,
@@ -275,8 +283,6 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
                 "value": value
             }
         )
-
-        return None
 
     # --- Shared recipe ---
 
@@ -410,15 +416,16 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
         return category_of(self.hand_strength())
 
     def talk(self) -> TalkAction:
-        """Draws from the personality's talk table, after adjusting it for a strong hand."""
-        weights = dict(self.personality.talk)  # a copy: the personality's table is shared
-
-        # With a strong hand, the weight of BLUFF moves to SEND (bluffing only makes sense without a hand)
-        if self.agent.hand.category == Category.STRONG:
-            weights[TalkAction.SEND] += weights.pop(TalkAction.BLUFF)
-
+        """Draws from the personality's talk table."""
+        weights = self.personality.talk
         actions = list(weights)
         return self.rng.choices(actions, weights=[weights[action] for action in actions])[0]
+
+    def bluff_category(self) -> Category:
+        """A bluff announces any category except the real one: a weak hand may pass for
+        medium or strong, and a strong one may pass for weak to lure the opponents into calling."""
+        real = self.agent.hand.category
+        return self.rng.choice([category for category in Category if category != real])
 
     def draw_opening(self) -> Card:
         """Draw with the personality's opening table. With 2 cards there is no "medium"."""

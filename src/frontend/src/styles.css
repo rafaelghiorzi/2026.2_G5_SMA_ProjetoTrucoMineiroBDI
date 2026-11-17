@@ -81,3 +81,17 @@ main { padding: .6rem; }
 .fan .card { width: 2.8cqw; margin: 0 -.5cqw; rotate: var(--r, 0deg); filter: drop-shadow(0 .15cqw 0 #0008); }
 .fan .card.back { border-width: 1px; box-shadow: 0 0 0 1px var(--ink); }
 .fan .joker { font-size: clamp(5px, .7cqw, 8px); }
+/* Connection state and the person's seat */
+.link { font-size: .85rem; align-self: center; } .link.on { color: var(--teamA); } .link.off { color: #ff9a8f; }
+.meta small { opacity: .6; }
+button:disabled { opacity: .5; cursor: default; transform: none; }
+.heard { margin: 0; font-size: .85em; } .heard strong { color: var(--team); }
+
+/* What the person is asked: fixed at the bottom, over the table, so it is never off screen */
+.act { position: fixed; z-index: 10; left: 50%; bottom: 1rem; translate: -50% 0; max-width: calc(100vw - 2rem); background: #2b1b12f2; border: 3px solid var(--brass); box-shadow: 0 6px 0 #0008; padding: .6rem 1rem; display: grid; gap: .5rem; }
+.act p { margin: 0; }
+.act .choices { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; }
+.act .pick { padding: .2rem; line-height: 0; }
+.act .pick .card { width: 3.4rem; }
+.act .loud { color: var(--brass); font-weight: 700; border-color: var(--brass); }
+.act .bluff { color: #ff9a8f; }

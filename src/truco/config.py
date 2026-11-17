@@ -26,6 +26,7 @@ AGENT_PASSWORD = "truco"
 ONTOLOGY = "truco-mineiro"
 TALK_TIMEOUT = 15  # seconds the talk window stays open before the table asks the board to close it
 TURN_TIMEOUT = 15  # seconds waiting for a play before asking again
+HUMAN_TIMEOUT = 3600  # a person takes their time: the table waits this long for a human seat
 
 
 # ============================================================================
@@ -233,6 +234,8 @@ FOLD_BONUS_INITIAL_CALLS = 2
 # ============================================================================
 # Personalities
 # ============================================================================
+
+HUMAN_SPY_SUCCESS = 0.50  # a person spying succeeds as often as the Rational Shark
 
 class OpeningWeights(NamedTuple):
     """Chance (%) of opening the round with the strong, the middle or the weak card."""
