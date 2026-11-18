@@ -215,7 +215,7 @@ MIN_GUESS = 0.027
 MAX_GUESS = 1.0
 
 NOT_LISTENING_FACTOR = 0.7  # trust in the partner for whoever did not choose "listen"
-CALL_ANNOUNCES = Category.MEDIUM  # calling truco counts as announcing this
+CALL_ANNOUNCES = Category.STRONG  # calling truco counts as announcing this
 
 
 # ============================================================================

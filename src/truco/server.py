@@ -113,12 +113,9 @@ async def start_match(req: MatchRequest = MatchRequest()):
 
 
 async def _start(req: MatchRequest) -> dict:
-    if req.seed is not None:
-        generator = random.Random(req.seed)
-    else:
-        generator = random.Random()
-
-    names = req.lineup or [generator.choice(PERSONALITIES).__name__ for _ in range(4)]
+    # The seed fixes the deals and the players' draws; the lineup is drawn anew on every click,
+    # so each "Nova partida" brings a different table. Pass `lineup` to repeat one.
+    names = req.lineup or [random.choice(PERSONALITIES).__name__ for _ in range(4)]
     if len(names) != 4 or any(n not in BEHAVIOURS for n in names):
         raise HTTPException(422, f"lineup precisa de 4 nomes entre {list(BEHAVIOURS)}")
     lineup: list = [BEHAVIOURS[n] for n in names]

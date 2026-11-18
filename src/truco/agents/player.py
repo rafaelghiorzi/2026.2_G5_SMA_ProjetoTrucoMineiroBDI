@@ -302,10 +302,15 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
         return self.agent.rounds.count(True) - self.agent.rounds.count(False)
 
     def hand_strength(self) -> float:
-        """With no cards left, my last card played is the one still disputing this round."""
-        if len(self.agent.hand) > 0:
-            return self.agent.hand.strength
-        return self.agent.played[self.agent.me][-1].power
+        """Mean power of my cards still in play: the ones in hand plus the one I put on the
+        table this round, which is still disputing it. Cards of finished rounds no longer count."""
+        cards = list(self.agent.hand)
+        on_table = self.current_round_cards().get(self.agent.me)
+        if on_table is not None:
+            cards.append(on_table)
+        if not cards:  # the point is over
+            return self.agent.played[self.agent.me][-1].power
+        return mean(card.power for card in cards)
 
     def belief_about(self, player: JID) -> float:
         """Neutral guess -> + bias -> mixed with announcements according to trust."""
@@ -324,10 +329,17 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
                 confidence *= NOT_LISTENING_FACTOR
             value = confidence * CATEGORY_VALUE[announcement.category] + (1 - confidence) * guess
 
-        # 4. Mean of the 3 cards: the played ones with their real power, the rest with the value
+        # 4. Same measure as hand_strength: only the cards still in play. The one on the table
+        # this round counts with its real power, the unseen ones with the value. Cards of
+        # finished rounds are left out: a caller who spent weak cards and kept the manilha
+        # must not look weak because of them.
         played = self.agent.played[player]
         remaining = CARDS_PER_HAND - len(played)
-        return (sum(card.power for card in played) + remaining * value) / CARDS_PER_HAND
+        on_table = self.current_round_cards().get(player)
+        live = [on_table.power] if on_table is not None else []
+        if remaining + len(live) == 0:  # the point is over
+            return played[-1].power
+        return (sum(live) + remaining * value) / (remaining + len(live))
 
     def threat(self) -> float:
         """Mean of the beliefs about the two opponents."""

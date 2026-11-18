@@ -1,0 +1,929 @@
+{
+  "actors": [
+    {
+      "id": "E-J",
+      "text": "Jogador",
+      "type": "istar.Role",
+      "x": 602,
+      "y": 537,
+      "customProperties": {
+        "Description": "Papel genérico de quem joga uma partida presencial de Truco Mineiro. Não há mesa, árbitro nem sistema: toda coordenação (embaralhar, distribuir, julgar e contar pontos) é feita pelos próprios jogadores. Sinais entre parceiros (piscadas, gestos) podem ser vistos pelos adversários atentos, e um jogador pode fazer sinais falsos de propósito."
+      },
+      "nodes": [
+        {
+          "id": "E-G1",
+          "text": "Partida vencida pela dupla",
+          "type": "istar.Goal",
+          "x": 1048,
+          "y": 593,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-QJ",
+          "text": "Partida justa",
+          "type": "istar.Quality",
+          "x": 1233,
+          "y": 600,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-G2",
+          "text": "Mão vencida",
+          "type": "istar.Goal",
+          "x": 1052,
+          "y": 743,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-G3",
+          "text": "Pontos da dupla registrados",
+          "type": "istar.Goal",
+          "x": 1315,
+          "y": 741,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-G4",
+          "text": "Cartas recebidas",
+          "type": "istar.Goal",
+          "x": 833,
+          "y": 751,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-T1",
+          "text": "Avaliar força da mão",
+          "type": "istar.Task",
+          "x": 819,
+          "y": 916,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-G5",
+          "text": "Duas de três rodadas vencidas",
+          "type": "istar.Goal",
+          "x": 1034,
+          "y": 918,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-G6",
+          "text": "Aposta da mão administrada",
+          "type": "istar.Goal",
+          "x": 1475,
+          "y": 920,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-G7",
+          "text": "Placar mantido",
+          "type": "istar.Goal",
+          "x": 1561,
+          "y": 603,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-G8",
+          "text": "Vencedor de cada mão reconhecido",
+          "type": "istar.Goal",
+          "x": 1377,
+          "y": 598,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-T3",
+          "text": "Interpretar sinais do parceiro",
+          "type": "istar.Task",
+          "x": 664,
+          "y": 1055,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-T2",
+          "text": "Observar as próprias cartas",
+          "type": "istar.Task",
+          "x": 811,
+          "y": 1056,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-T4",
+          "text": "Jogar a carta mais forte",
+          "type": "istar.Task",
+          "x": 981,
+          "y": 1046,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-T5",
+          "text": "Guardar a manilha para a rodada decisiva",
+          "type": "istar.Task",
+          "x": 1111,
+          "y": 1045,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-T10",
+          "text": "Correr",
+          "type": "istar.Task",
+          "x": 1252,
+          "y": 1040,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-T9",
+          "text": "Aumentar (seis, nove, doze)",
+          "type": "istar.Task",
+          "x": 1484,
+          "y": 1039,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-T7",
+          "text": "Blefar (trucar com mão fraca)",
+          "type": "istar.Task",
+          "x": 1364,
+          "y": 1037,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-T6",
+          "text": "Pedir truco",
+          "type": "istar.Task",
+          "x": 1730,
+          "y": 1042,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-R1",
+          "text": "Cartas na mão",
+          "type": "istar.Resource",
+          "x": 828,
+          "y": 1191,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-Q1",
+          "text": "Pontos ganhos maximizados",
+          "type": "istar.Quality",
+          "x": 1730,
+          "y": 1282,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-TS",
+          "text": "Trocar sinais durante a mão",
+          "type": "istar.Task",
+          "x": 2103,
+          "y": 918,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-TS1",
+          "text": "Fazer sinal ao parceiro (piscada, gesto)",
+          "type": "istar.Task",
+          "x": 1869,
+          "y": 1031,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-TS2",
+          "text": "Espiar sinais dos adversários",
+          "type": "istar.Task",
+          "x": 2193,
+          "y": 1038,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-TS3",
+          "text": "Fazer sinal falso para enganar",
+          "type": "istar.Task",
+          "x": 2039,
+          "y": 1034,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-TS4",
+          "text": "Não sinalizar",
+          "type": "istar.Task",
+          "x": 2359,
+          "y": 1044,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-Q3",
+          "text": "Crenças precisas sobre as mãos",
+          "type": "istar.Quality",
+          "x": 2206,
+          "y": 1196,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-Q4",
+          "text": "Adversários mal informados",
+          "type": "istar.Quality",
+          "x": 1964,
+          "y": 1196,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-Q2",
+          "text": "Risco de perder pontos controlado",
+          "type": "istar.Quality",
+          "x": 1250,
+          "y": 1201,
+          "customProperties": {
+            "Description": ""
+          }
+        },
+        {
+          "id": "E-T8",
+          "text": "Aceitar truco",
+          "type": "istar.Task",
+          "x": 1613,
+          "y": 1048,
+          "customProperties": {
+            "Description": ""
+          }
+        }
+      ]
+    },
+    {
+      "id": "E-D",
+      "text": "Quem embaralha e distribui",
+      "type": "istar.Role",
+      "x": 601,
+      "y": 173,
+      "customProperties": {
+        "Description": "Papel rotativo assumido por um dos jogadores a cada mão."
+      },
+      "nodes": []
+    },
+    {
+      "id": "E-P",
+      "text": "Parceiro de dupla",
+      "type": "istar.Role",
+      "x": 464,
+      "y": 832,
+      "customProperties": {
+        "Description": "Jogador da mesma dupla."
+      },
+      "nodes": []
+    },
+    {
+      "id": "E-M",
+      "text": "Marcador de pontos",
+      "type": "istar.Role",
+      "x": 1606,
+      "y": 29,
+      "customProperties": {
+        "Description": "Papel assumido por um dos jogadores; registra os tentos (papel, feijão etc.)."
+      },
+      "nodes": []
+    },
+    {
+      "id": "E-A",
+      "text": "Adversário",
+      "type": "istar.Role",
+      "x": 1424,
+      "y": 222,
+      "customProperties": {
+        "Description": "Jogador da dupla oposta."
+      },
+      "nodes": []
+    }
+  ],
+  "orphans": [],
+  "dependencies": [
+    {
+      "id": "E-D1",
+      "text": "Cartas distribuídas",
+      "type": "istar.Goal",
+      "x": 822,
+      "y": 306,
+      "customProperties": {
+        "Description": ""
+      },
+      "source": "E-G4",
+      "target": "E-D"
+    },
+    {
+      "id": "602bf55e-8211-415e-855d-96f2dff11485",
+      "text": "Embaralhamento justo",
+      "type": "istar.Quality",
+      "x": 653,
+      "y": 302,
+      "customProperties": {
+        "Description": ""
+      },
+      "source": "E-G4",
+      "target": "E-D"
+    },
+    {
+      "id": "28d3b879-3d59-455b-936f-ff5268306505",
+      "text": "Sinais sobre a força da mão",
+      "type": "istar.Resource",
+      "x": 438,
+      "y": 1068,
+      "customProperties": {
+        "Description": ""
+      },
+      "source": "E-T3",
+      "target": "E-P"
+    },
+    {
+      "id": "9158366e-683b-4df6-b1cc-d45737ac5b59",
+      "text": "Regras combinadas respeitadas",
+      "type": "istar.Quality",
+      "x": 1211,
+      "y": 397,
+      "customProperties": {
+        "Description": ""
+      },
+      "source": "E-QJ",
+      "target": "E-A"
+    },
+    {
+      "id": "5a3ad7cd-7642-4829-91a6-8ea3bb797504",
+      "text": "Resposta ao truco (correr, aceitar, aumentar)",
+      "type": "istar.Goal",
+      "x": 1707,
+      "y": 407,
+      "customProperties": {
+        "Description": ""
+      },
+      "source": "E-T6",
+      "target": "E-A"
+    },
+    {
+      "id": "3b7a569f-6adf-442b-b9a1-d3a2190359ea",
+      "text": "Vencedor da mão reconhecido por consenso",
+      "type": "istar.Goal",
+      "x": 1373,
+      "y": 399,
+      "customProperties": {
+        "Description": ""
+      },
+      "source": "E-G8",
+      "target": "E-A"
+    },
+    {
+      "id": "60e2804f-daae-469b-a6b9-88a2825e06ba",
+      "text": "Placar atualizado",
+      "type": "istar.Goal",
+      "x": 1633,
+      "y": 188,
+      "customProperties": {
+        "Description": ""
+      },
+      "source": "E-G7",
+      "target": "E-M"
+    },
+    {
+      "id": "9dd2b2a2-d09b-4fdb-beba-8aa3d0cd099a",
+      "text": "Contagem honesta de pontos",
+      "type": "istar.Quality",
+      "x": 1517,
+      "y": 189,
+      "customProperties": {
+        "Description": ""
+      },
+      "source": "E-G7",
+      "target": "E-M"
+    }
+  ],
+  "links": [
+    {
+      "id": "a91fbd95-8699-45fd-afd3-8c90603cefab",
+      "type": "istar.DependencyLink",
+      "source": "9dd2b2a2-d09b-4fdb-beba-8aa3d0cd099a",
+      "target": "E-M"
+    },
+    {
+      "id": "5366616c-7857-456c-8598-ef89fd517b09",
+      "type": "istar.DependencyLink",
+      "source": "E-G7",
+      "target": "9dd2b2a2-d09b-4fdb-beba-8aa3d0cd099a"
+    },
+    {
+      "id": "fada75f1-c6a9-416a-9988-37f986d93967",
+      "type": "istar.DependencyLink",
+      "source": "60e2804f-daae-469b-a6b9-88a2825e06ba",
+      "target": "E-M"
+    },
+    {
+      "id": "84e1650b-4839-409a-bfb5-d184fc540405",
+      "type": "istar.DependencyLink",
+      "source": "E-G7",
+      "target": "60e2804f-daae-469b-a6b9-88a2825e06ba"
+    },
+    {
+      "id": "f1a854da-6f01-4ad3-b3b6-6ed61eeb5d83",
+      "type": "istar.DependencyLink",
+      "source": "3b7a569f-6adf-442b-b9a1-d3a2190359ea",
+      "target": "E-A"
+    },
+    {
+      "id": "b7f03d58-81b8-408d-9528-5a4d302c5337",
+      "type": "istar.DependencyLink",
+      "source": "E-G8",
+      "target": "3b7a569f-6adf-442b-b9a1-d3a2190359ea"
+    },
+    {
+      "id": "4b393c3c-4792-4b01-a98f-14026714a43b",
+      "type": "istar.DependencyLink",
+      "source": "5a3ad7cd-7642-4829-91a6-8ea3bb797504",
+      "target": "E-A"
+    },
+    {
+      "id": "b825f97b-30e2-4a7b-a5b3-04e1dcdc5722",
+      "type": "istar.DependencyLink",
+      "source": "E-T6",
+      "target": "5a3ad7cd-7642-4829-91a6-8ea3bb797504"
+    },
+    {
+      "id": "cab6ee04-1b0f-46f1-8dbd-d8c47d391740",
+      "type": "istar.DependencyLink",
+      "source": "9158366e-683b-4df6-b1cc-d45737ac5b59",
+      "target": "E-A"
+    },
+    {
+      "id": "cccd4614-717c-4472-84af-91029906c9c5",
+      "type": "istar.DependencyLink",
+      "source": "E-QJ",
+      "target": "9158366e-683b-4df6-b1cc-d45737ac5b59"
+    },
+    {
+      "id": "9c95f2e3-3396-4fee-bdec-22548f431579",
+      "type": "istar.DependencyLink",
+      "source": "28d3b879-3d59-455b-936f-ff5268306505",
+      "target": "E-P"
+    },
+    {
+      "id": "634794d7-9d0e-4ea5-9bad-cee04905b36e",
+      "type": "istar.DependencyLink",
+      "source": "E-T3",
+      "target": "28d3b879-3d59-455b-936f-ff5268306505"
+    },
+    {
+      "id": "a60cffaf-6449-4a65-8ddb-bf8837b20025",
+      "type": "istar.DependencyLink",
+      "source": "E-G4",
+      "target": "602bf55e-8211-415e-855d-96f2dff11485"
+    },
+    {
+      "id": "525bf793-0276-4dbe-81fb-7ce76e9336b7",
+      "type": "istar.DependencyLink",
+      "source": "602bf55e-8211-415e-855d-96f2dff11485",
+      "target": "E-D"
+    },
+    {
+      "id": "2261933c-d532-48fb-8db4-a78921ae0535",
+      "type": "istar.DependencyLink",
+      "source": "E-D1",
+      "target": "E-D"
+    },
+    {
+      "id": "a105ac6e-e9eb-49d2-abeb-7da9244e4fd6",
+      "type": "istar.DependencyLink",
+      "source": "E-G4",
+      "target": "E-D1"
+    },
+    {
+      "id": "57b61105-7555-4926-970f-a435372455e4",
+      "type": "istar.IsALink",
+      "source": "E-J",
+      "target": "E-P"
+    },
+    {
+      "id": "20750ec0-f4ee-4e32-b30d-f23f05933767",
+      "type": "istar.IsALink",
+      "source": "E-J",
+      "target": "E-A"
+    },
+    {
+      "id": "7ddf6407-083a-4687-bb95-cd796e4cdf02",
+      "type": "istar.ParticipatesInLink",
+      "source": "E-J",
+      "target": "E-D"
+    },
+    {
+      "id": "5433b2e8-a70d-4f8b-9a70-7de1d2509510",
+      "type": "istar.ParticipatesInLink",
+      "source": "E-J",
+      "target": "E-M"
+    },
+    {
+      "id": "49a4a8d7-3a43-4653-a632-7a251c4ce433",
+      "type": "istar.AndRefinementLink",
+      "source": "E-G4",
+      "target": "E-G2"
+    },
+    {
+      "id": "e767d40f-d344-49a8-98a0-434288139488",
+      "type": "istar.AndRefinementLink",
+      "source": "E-T1",
+      "target": "E-G2"
+    },
+    {
+      "id": "331fb4c3-e053-416a-a026-586a360775c5",
+      "type": "istar.AndRefinementLink",
+      "source": "E-G5",
+      "target": "E-G2"
+    },
+    {
+      "id": "de7de478-e009-446e-b18a-e7fab23ddf18",
+      "type": "istar.AndRefinementLink",
+      "source": "E-G6",
+      "target": "E-G2"
+    },
+    {
+      "id": "083b0ee6-c229-4b84-a754-f440c96cc637",
+      "type": "istar.AndRefinementLink",
+      "source": "E-TS",
+      "target": "E-G2"
+    },
+    {
+      "id": "20338a7f-243c-48f1-8333-81776304dcf6",
+      "type": "istar.OrRefinementLink",
+      "source": "E-TS1",
+      "target": "E-TS"
+    },
+    {
+      "id": "5683b3af-d74d-4045-984c-4661ed2ebfd6",
+      "type": "istar.OrRefinementLink",
+      "source": "E-TS2",
+      "target": "E-TS"
+    },
+    {
+      "id": "a8d84bdd-ab5a-4437-920a-e65c7f5e2ce4",
+      "type": "istar.OrRefinementLink",
+      "source": "E-TS3",
+      "target": "E-TS"
+    },
+    {
+      "id": "ab6d5365-5254-432d-aace-18fc2e219633",
+      "type": "istar.OrRefinementLink",
+      "source": "E-TS4",
+      "target": "E-TS"
+    },
+    {
+      "id": "c23dba34-88f6-4a02-b3db-75aba2305258",
+      "type": "istar.ContributionLink",
+      "source": "E-TS3",
+      "target": "E-Q4",
+      "label": "help"
+    },
+    {
+      "id": "59a2c5be-9a1f-4851-80d5-49f7e7dcb369",
+      "type": "istar.ContributionLink",
+      "source": "E-TS1",
+      "target": "E-Q4",
+      "label": "hurt"
+    },
+    {
+      "id": "a97e2222-b486-4a74-bb2c-6f4f2c6d01f4",
+      "type": "istar.ContributionLink",
+      "source": "E-TS2",
+      "target": "E-Q3",
+      "label": "help"
+    },
+    {
+      "id": "d415b225-ba16-4845-b537-24fbc837a5b1",
+      "type": "istar.AndRefinementLink",
+      "source": "E-G2",
+      "target": "E-G1"
+    },
+    {
+      "id": "c7ac3da0-05ea-41d9-b477-9d6ff75d57fe",
+      "type": "istar.AndRefinementLink",
+      "source": "E-G3",
+      "target": "E-G1"
+    },
+    {
+      "id": "15dae47e-4fb7-425f-9f0b-d99e9295560f",
+      "type": "istar.QualificationLink",
+      "source": "E-QJ",
+      "target": "E-G1"
+    },
+    {
+      "id": "1e14b71e-e41f-44e7-bdbb-8286acd4ee51",
+      "type": "istar.AndRefinementLink",
+      "source": "E-T3",
+      "target": "E-T1"
+    },
+    {
+      "id": "3867d4e2-aee2-4ca5-b8e1-352a857de899",
+      "type": "istar.AndRefinementLink",
+      "source": "E-T2",
+      "target": "E-T1"
+    },
+    {
+      "id": "6bdb1280-f142-4450-9124-ac1baa158bfe",
+      "type": "istar.NeededByLink",
+      "source": "E-R1",
+      "target": "E-T2"
+    },
+    {
+      "id": "335116e3-080b-465e-a08c-917572fe79a6",
+      "type": "istar.OrRefinementLink",
+      "source": "E-T4",
+      "target": "E-G5"
+    },
+    {
+      "id": "0fd6350d-9606-4bf2-8028-036d451d5699",
+      "type": "istar.OrRefinementLink",
+      "source": "E-T5",
+      "target": "E-G5"
+    },
+    {
+      "id": "c3c59c4f-1dc3-435b-a6bc-0c90d0e61c59",
+      "type": "istar.OrRefinementLink",
+      "source": "E-T10",
+      "target": "E-G6"
+    },
+    {
+      "id": "bf3b3092-730a-460b-8420-f567d7c93e7c",
+      "type": "istar.OrRefinementLink",
+      "source": "E-T9",
+      "target": "E-G6"
+    },
+    {
+      "id": "d6e8dbf8-7375-460e-8b1e-bd7a1e1c24ac",
+      "type": "istar.OrRefinementLink",
+      "source": "E-T7",
+      "target": "E-G6"
+    },
+    {
+      "id": "a587370f-23da-4500-9036-e9ba42f986dc",
+      "type": "istar.OrRefinementLink",
+      "source": "E-T6",
+      "target": "E-G6"
+    },
+    {
+      "id": "49c2273d-e385-4f70-a14d-ffe124c01a5c",
+      "type": "istar.ContributionLink",
+      "source": "E-T8",
+      "target": "E-Q1",
+      "label": "help"
+    },
+    {
+      "id": "f8f93f4d-010b-4ca5-af49-06f4d7c54234",
+      "type": "istar.ContributionLink",
+      "source": "E-T10",
+      "target": "E-Q1",
+      "label": "hurt"
+    },
+    {
+      "id": "9e53cb87-41a6-41bf-b84b-1ff4764bcc67",
+      "type": "istar.ContributionLink",
+      "source": "E-T9",
+      "target": "E-Q1",
+      "label": "help"
+    },
+    {
+      "id": "7f4c7e88-cadb-4c74-baab-acf3078fa66b",
+      "type": "istar.ContributionLink",
+      "source": "E-T9",
+      "target": "E-Q2",
+      "label": "hurt"
+    },
+    {
+      "id": "419ebeac-4616-46e6-ab0e-94a18f379044",
+      "type": "istar.ContributionLink",
+      "source": "E-T7",
+      "target": "E-Q2",
+      "label": "hurt"
+    },
+    {
+      "id": "9bb779b6-86a5-4045-a32a-0a829f5a20b8",
+      "type": "istar.ContributionLink",
+      "source": "E-T7",
+      "target": "E-Q1",
+      "label": "help"
+    },
+    {
+      "id": "7c36a92e-cf3d-4fe5-9e9c-54383aa4c7e2",
+      "type": "istar.ContributionLink",
+      "source": "E-T6",
+      "target": "E-Q1",
+      "label": "help"
+    },
+    {
+      "id": "bbb93b65-e91f-4a0e-a4b6-d9499d7808f5",
+      "type": "istar.ContributionLink",
+      "source": "E-T10",
+      "target": "E-Q2",
+      "label": "help"
+    },
+    {
+      "id": "4e06c3dc-b192-40f6-b304-e470b9d31214",
+      "type": "istar.OrRefinementLink",
+      "source": "E-T8",
+      "target": "E-G6"
+    },
+    {
+      "id": "aa5bb443-8e65-4b0f-bfd7-ea76c1a34928",
+      "type": "istar.AndRefinementLink",
+      "source": "E-G8",
+      "target": "E-G3"
+    },
+    {
+      "id": "bb5772b2-b76d-494c-893c-866027f3f1b6",
+      "type": "istar.AndRefinementLink",
+      "source": "E-G7",
+      "target": "E-G3"
+    }
+  ],
+  "display": {
+    "E-G1": {
+      "width": 118.33331298828125,
+      "height": 62.99998474121094
+    },
+    "E-G2": {
+      "width": 102,
+      "height": 66.81666564941406
+    },
+    "E-G3": {
+      "width": 124,
+      "height": 52
+    },
+    "E-G4": {
+      "width": 110.11663818359375,
+      "height": 52
+    },
+    "E-T1": {
+      "width": 132.11663818359375,
+      "height": 61
+    },
+    "E-G5": {
+      "width": 116.33331298828125,
+      "height": 57.99998474121094
+    },
+    "E-G6": {
+      "width": 110.11663818359375,
+      "height": 62
+    },
+    "E-G7": {
+      "width": 115,
+      "height": 51.81666564941406
+    },
+    "E-G8": {
+      "width": 134,
+      "height": 59
+    },
+    "E-T3": {
+      "width": 122.33331298828125,
+      "height": 57.99998474121094
+    },
+    "E-T2": {
+      "width": 126.33331298828125,
+      "height": 56.99998474121094
+    },
+    "E-T4": {
+      "width": 111.33331298828125,
+      "height": 56.99998474121094
+    },
+    "E-T5": {
+      "width": 124.33331298828125,
+      "height": 59.99998474121094
+    },
+    "E-T9": {
+      "width": 113.33331298828125,
+      "height": 48.99998474121094
+    },
+    "E-T7": {
+      "width": 106.33331298828125,
+      "height": 47.99998474121094
+    },
+    "E-TS": {
+      "width": 123.11663818359375,
+      "height": 52
+    },
+    "E-TS1": {
+      "width": 141.11663818359375,
+      "height": 67
+    },
+    "E-TS2": {
+      "width": 132.11663818359375,
+      "height": 57
+    },
+    "E-TS3": {
+      "width": 133.11663818359375,
+      "height": 59
+    },
+    "E-TS4": {
+      "width": 115,
+      "height": 55
+    },
+    "E-Q3": {
+      "width": 137.041259765625,
+      "height": 77.0076904296875
+    },
+    "E-Q4": {
+      "width": 109.0328369140625,
+      "height": 64.00665283203125
+    },
+    "E-D1": {
+      "width": 108.39999389648438,
+      "height": 58.81666564941406
+    },
+    "602bf55e-8211-415e-855d-96f2dff11485": {
+      "width": 120.436279296875,
+      "height": 62.82350158691406
+    },
+    "9158366e-683b-4df6-b1cc-d45737ac5b59": {
+      "width": 140.0418701171875,
+      "height": 69.82389831542969
+    },
+    "5a3ad7cd-7642-4829-91a6-8ea3bb797504": {
+      "width": 145,
+      "height": 55.81666564941406
+    },
+    "3b7a569f-6adf-442b-b9a1-d3a2190359ea": {
+      "width": 143,
+      "height": 66.31666564941406
+    },
+    "60e2804f-daae-469b-a6b9-88a2825e06ba": {
+      "width": 106,
+      "height": 47.81666564941406
+    },
+    "E-D": {
+      "collapsed": true
+    },
+    "E-P": {
+      "collapsed": true
+    },
+    "E-M": {
+      "collapsed": true
+    },
+    "E-A": {
+      "collapsed": true
+    }
+  },
+  "tool": "pistar.2.1.0",
+  "istar": "2.0",
+  "saveDate": "Wed, 18 Nov 2026 16:53:19 GMT",
+  "diagram": {
+    "width": 2575,
+    "height": 1584,
+    "name": "Truco Mineiro - Early Requirements (as-is) - SR",
+    "customProperties": {
+      "Description": ""
+    }
+  }
+}
