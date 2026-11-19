@@ -1,8 +1,11 @@
 """Entry point: sets up the agents and plays one match."""
 
 import asyncio
+import csv
+import logging
 import random
 import sys
+from pathlib import Path
 from itertools import product
 
 import spade
@@ -123,6 +126,9 @@ async def main() -> None:
 
 async def run_batch(results_file: str) -> None:
     """Todas contra todas e cada BDI contra cada controle, GAMES_PER_SIDE partidas por lado."""
+    done_seeds = finished_seeds(results_file)
+    if done_seeds:
+        print(f"retomando: {len(done_seeds)} partidas já estão em {results_file}", flush=True)
     recorder = MetricsRecorder(results_file)
 
     # Todas contra todas (BDI) + cada BDI contra cada controle.
@@ -139,6 +145,8 @@ async def run_batch(results_file: str) -> None:
             for _ in range(GAMES_PER_SIDE):
                 seed += 1  # uma seed diferente por partida
                 done += 1
+                if seed in done_seeds:  # já jogada numa execução interrompida
+                    continue
                 name = f"{team_a.__name__} x {team_b.__name__}"
                 try:
                     score = await play_match(
@@ -155,8 +163,22 @@ async def run_batch(results_file: str) -> None:
         recorder.close()  # mesmo se algo falhar, o que foi medido chega ao arquivo
 
 
+def finished_seeds(results_file: str) -> set[int]:
+    """Seeds das partidas que chegaram ao fim (match_end) num CSV de uma execução anterior.
+
+    Uma partida interrompida no meio tem eventos mas não match_end: é jogada de novo. Os
+    eventos dela que ficaram no arquivo são descartados na análise (ver analise.py)."""
+    file = Path(results_file)
+    if not file.exists():
+        return set()
+    with file.open(newline="", encoding="utf-8") as f:
+        return {int(row["seed"]) for row in csv.DictReader(f) if row["event"] == "match_end"}
+
+
 def run() -> None:
     setup_console()
+    # slixmpp avisa a cada mensagem com campo "id"; é inofensivo e enche o terminal
+    logging.getLogger().addFilter(lambda record: "Unknown stanza interface" not in record.getMessage())
     spade.run(main(), embedded_xmpp_server=True)
 
 if __name__ == "__main__":
