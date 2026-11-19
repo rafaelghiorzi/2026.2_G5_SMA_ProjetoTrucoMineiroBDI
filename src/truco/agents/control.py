@@ -54,10 +54,18 @@ class Coward(ControlBehaviour):
 
 
 class Madman(ControlBehaviour):
-    """Calls whenever it has a manilha, never folds, always plays the strongest card."""
+    """Calls whenever it was dealt a manilha, never folds, always plays the strongest card."""
+
+    # It plays the strongest card first and truco can only be called from round 2 on, so by
+    # then the manilha has usually left its hand: checking only the cards still in hand made
+    # it call in 3% of its chances. False brings back that old rule (for experiments).
+    counts_dealt_manilha: bool = True
 
     def should_call(self) -> bool:
-        return self.agent.hand.has_manilha
+        if not self.counts_dealt_manilha:
+            return self.agent.hand.has_manilha
+        dealt = [*self.agent.hand, *self.agent.played[self.agent.me]]
+        return any(card.is_manilha for card in dealt)
 
     def answer_call(self, value_called: int) -> Response:
         if value_called >= 12:  # there is nothing above twelve to raise to
