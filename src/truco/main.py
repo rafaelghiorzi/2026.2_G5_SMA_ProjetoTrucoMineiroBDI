@@ -61,8 +61,8 @@ async def play_match(
             behaviour, behaviour.rng = entry, rng
         else:
             behaviour = entry(rng=rng, think_time=think_time)
-        # Maverick's fold bonus stays neutral against control players
-        if isinstance(behaviour, MaverickBluffer):
+        # Opponent models (Maverick's fold bonus, Rational Shark's) stay neutral against control players
+        if hasattr(behaviour, "opponents_are_control"):
             behaviour.opponents_are_control = issubclass(kinds[(i + 1) % 4], ControlBehaviour)
 
         players.append(Player(

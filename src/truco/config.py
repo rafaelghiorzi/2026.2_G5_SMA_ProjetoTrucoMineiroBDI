@@ -229,6 +229,18 @@ CALL_ANNOUNCES = Category.MEDIUM
 LOOSE_CANNON_BIAS_PER_ADVANTAGE = -0.20  # bias about opponents = this × advantage
 GRINDER_THREAT_TRUST = 0.65  # the Grinder only listens to opponents when it is a threat
 
+# Rational Shark's opponent model (the poker shark reads and exploits the table):
+# - call bonus = SHARK_EXPLOIT_WEIGHT × (fold_rate − SHARK_EQUILIBRIUM_FOLDS), where fold_rate uses
+#   the same smoothing as the Maverick's. A pure bluff of truco breaks even when the opponent folds
+#   50% of the time, so it calls more against whoever folds above that and less against whoever
+#   defends more. Unlike the Maverick's bonus, it can be negative.
+# - a call from an opponent stands for the mean strength it showed when it had called before
+#   (only points where all its cards were revealed), with the announced value as a prior worth
+#   SHARK_PRIOR_CALLS observations.
+SHARK_EXPLOIT_WEIGHT = 0.3
+SHARK_EQUILIBRIUM_FOLDS = 0.5
+SHARK_PRIOR_CALLS = 2
+
 # Maverick's fold bonus: WEIGHT × (folds + INITIAL_FOLDS) / (calls + INITIAL_CALLS)
 FOLD_BONUS_WEIGHT = 0.2
 FOLD_BONUS_INITIAL_FOLDS = 1

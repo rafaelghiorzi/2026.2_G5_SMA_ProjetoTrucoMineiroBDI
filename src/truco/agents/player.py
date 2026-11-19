@@ -13,7 +13,7 @@ implemented by the four classes at the end of this file. See also agents/control
 import random
 import asyncio
 from abc import abstractmethod
-from collections import Counter
+from collections import Counter, defaultdict
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from statistics import mean
@@ -42,6 +42,9 @@ from truco.config import (
     OWN_HAND_WEIGHT,
     POINTS_TO_WIN,
     ROUND_BALANCE_WEIGHT,
+    SHARK_EQUILIBRIUM_FOLDS,
+    SHARK_EXPLOIT_WEIGHT,
+    SHARK_PRIOR_CALLS,
     TEAM,
     TURN_TIMEOUT,
     THINK_TIME,
@@ -326,7 +329,7 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
             confidence = self.trust(player, announcement.category, announcement.source)
             if not announcement.attentive:
                 confidence *= NOT_LISTENING_FACTOR
-            value = confidence * CATEGORY_VALUE[announcement.category] + (1 - confidence) * guess
+            value = confidence * self.announced_value(player, announcement) + (1 - confidence) * guess
 
         # 4. Same measure as hand_strength: only the cards still in play. The one on the table
         # this round counts with its real power, the unseen ones with the value. Cards of
@@ -480,6 +483,15 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
             **self.snapshot(),
             **info,
         })
+    def announced_value(self, player: JID, announcement: Announcement) -> float:
+        """Strength an announcement about `player` stands for. Only the Rational Shark changes it."""
+        return CATEGORY_VALUE[announcement.category]
+
+    def fold_rate(self, player: JID) -> float:
+        """Smoothed share of the calls `player` folded: FOLD_BONUS_INITIAL_* avoid 0 and 1."""
+        folds, calls = self.agent.folds[player], self.agent.calls_received[player]
+        return (folds + FOLD_BONUS_INITIAL_FOLDS) / (calls + FOLD_BONUS_INITIAL_CALLS)
+
     # --- What changes with the personality ---
     # CyclicBehaviour already uses ABCMeta, so @abstractmethod is enforced here.
 
@@ -509,7 +521,45 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
 
 
 class RationalShark(TrucoBehaviour):
+    """Calculates without bias and, like the poker shark, models its opponents: it exploits
+    whoever folds more (or less) than the equilibrium and learns how strong each opponent
+    really is when it calls truco. See SHARK_* in config."""
+
     personality = config.RATIONAL_SHARK
+
+    # False brings back the first version, with no opponent model (for experiments)
+    models_opponents: bool = True
+    # Same as the Maverick: against control players the model stays neutral
+    opponents_are_control: bool = False
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.caller_strengths: defaultdict[JID, list[float]] = defaultdict(list)
+        self.callers_this_point: set[JID] = set()
+
+    @property
+    def modelling(self) -> bool:
+        return self.models_opponents and not self.opponents_are_control
+
+    async def on_call(self, data: dict) -> None:
+        await super().on_call(data)
+        self.callers_this_point.add(JID(data["player"]))
+
+    async def on_point_end(self, data: dict) -> None:
+        """Before the next point erases the cards: what did each opponent who called hold?"""
+        for caller in self.callers_this_point & set(self.agent.opponents):
+            cards = self.agent.played.get(caller, [])
+            if len(cards) == CARDS_PER_HAND:  # only when all its cards were shown
+                self.caller_strengths[caller].append(mean(card.power for card in cards))
+        self.callers_this_point.clear()
+        await super().on_point_end(data)
+
+    def announced_value(self, player: JID, announcement: Announcement) -> float:
+        prior = super().announced_value(player, announcement)
+        if not self.modelling or announcement.source != Source.CALL or player not in self.agent.opponents:
+            return prior
+        seen = self.caller_strengths[player]
+        return (SHARK_PRIOR_CALLS * prior + sum(seen)) / (SHARK_PRIOR_CALLS + len(seen))
 
     def bias(self, player: JID) -> float:
         if player == self.agent.partner:
@@ -520,7 +570,11 @@ class RationalShark(TrucoBehaviour):
         return self.personality.trust
 
     def call_bonus(self) -> float:
-        return 0.0
+        """Positive against whoever folds more than the equilibrium, negative otherwise."""
+        if not self.modelling:
+            return 0.0
+        target = self.agent.opponents[0]  # plays right after me: answers my call
+        return SHARK_EXPLOIT_WEIGHT * (self.fold_rate(target) - SHARK_EQUILIBRIUM_FOLDS)
 
     def open_round(self) -> Card:
         """Fixed rule: the strongest if its power beats the threat, otherwise the weakest."""
