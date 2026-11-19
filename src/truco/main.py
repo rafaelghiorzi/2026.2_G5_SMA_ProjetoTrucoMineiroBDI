@@ -2,14 +2,16 @@
 
 import asyncio
 import random
+import sys
 from itertools import product
 
 import spade
 from slixmpp import JID
-from truco.config import AGENT_PASSWORD, XMPP_DOMAIN, THINK_TIME, TEAMS, RESULTS_FILE, SEED, TEAM
+from truco.config import AGENT_PASSWORD, XMPP_DOMAIN, THINK_TIME, TEAMS, SEED, TEAM
 
 from truco.match_log import close_match_log, open_match_log, setup_console
 from truco.metrics import MetricsRecorder
+from truco import experiments
 from truco.agents.table import TableAgent
 from truco.agents.blackboard import BlackboardAgent
 from truco.agents.control import ControlBehaviour, Coward, Madman
@@ -20,6 +22,9 @@ SEATS = ["A1", "B1", "A2", "B2"]
 PERSONALITIES = [Grinder, MaverickBluffer, LooseCannon, RationalShark]
 CONTROLS = [Coward, Madman]
 GAMES_PER_SIDE = 25  # partidas por confronto e por lado (use 1 para um teste rápido)
+# Condições rodadas quando nenhuma é passada na linha de comando (ver truco/experiments.py).
+# A "original" já foi rodada em 18/11 (results/events.csv), com as mesmas seeds.
+DEFAULT_CONDITIONS = ["anuncio", "recalibrado"]
 
 
 def lineup(team_a, team_b):
@@ -103,7 +108,22 @@ async def play_match(
     return table.score
 
 async def main() -> None:
-    recorder = MetricsRecorder(RESULTS_FILE)
+    """Roda o lote para cada condição pedida, cada uma no seu CSV.
+
+    Uso: python -m truco.main [condição ...], por exemplo: python -m truco.main anuncio recalibrado
+    """
+    conditions = sys.argv[1:] or DEFAULT_CONDITIONS
+    for name in conditions:  # falha logo se algum nome estiver errado
+        experiments.apply(name)
+    for name in conditions:
+        experiments.apply(name)
+        print(f"=== condição {name} -> {experiments.results_file(name)}", flush=True)
+        await run_batch(experiments.results_file(name))
+
+
+async def run_batch(results_file: str) -> None:
+    """Todas contra todas e cada BDI contra cada controle, GAMES_PER_SIDE partidas por lado."""
+    recorder = MetricsRecorder(results_file)
 
     # Todas contra todas (BDI) + cada BDI contra cada controle.
     # product já gera (X, Y) e (Y, X): é a troca de lado.
