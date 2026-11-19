@@ -4,7 +4,7 @@ This module imports nothing from the project or from SPADE, so any file can
 import it without creating cycles.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from enum import StrEnum
 from typing import Literal, NamedTuple
 
@@ -322,7 +322,9 @@ LOOSE_CANNON = Personality(
     spy_success=0.45,
 )
 
-GRINDER = Personality(
+# First version: in practice a "nit"/rock from poker (tight and passive). It called truco in 9%
+# of its chances, folded 93% of the calls and, when it accepted, won 79%: it folded far too much.
+GRINDER_ORIGINAL = Personality(
     opponent_bias=0.15,
     partner_bias=-0.10,
     trust=0.80,  # partner only; with opponents: GRINDER_THREAT_TRUST or 0
@@ -339,4 +341,15 @@ GRINDER = Personality(
         TalkAction.NOTHING: 25,
     },
     spy_success=0.25,
+)
+
+# The poker grinder: disciplined and low-variance, playing small edges over many hands, tight
+# but not afraid. Still calls only with strong hands (high raise_base) and still keeps its good
+# cards, but no longer overestimates the opponents nor folds hands that are worth accepting.
+GRINDER = replace(
+    GRINDER_ORIGINAL,
+    opponent_bias=0.05,
+    partner_bias=-0.05,
+    caution=0.03,
+    raise_base=0.72,
 )
