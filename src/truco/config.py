@@ -226,7 +226,13 @@ CALL_ANNOUNCES = Category.MEDIUM
 # Special personality rules
 # ============================================================================
 
-LOOSE_CANNON_BIAS_PER_ADVANTAGE = -0.20  # bias about opponents = this × advantage
+LOOSE_CANNON_BIAS_PER_ADVANTAGE = -0.20  # first version: bias about opponents = this × advantage
+
+# Loose Cannon's tilt: after losing points it underestimates the opponents and chases the losses,
+# as the poker literature describes tilt. Bias about opponents = TILT_BIAS × (points lost among
+# the last TILT_WINDOW) / TILT_WINDOW: 0 when it has not been losing, −0.30 after three losses.
+LOOSE_CANNON_TILT_WINDOW = 3
+LOOSE_CANNON_TILT_BIAS = -0.30
 GRINDER_THREAT_TRUST = 0.65  # the Grinder only listens to opponents when it is a threat
 
 # Rational Shark's opponent model (the poker shark reads and exploits the table):
@@ -315,7 +321,10 @@ MAVERICK_BLUFFER = Personality(
     spy_success=0.70,
 )
 
-LOOSE_CANNON = Personality(
+# First version: the score replaced part of the cards (score_weight) and the bias followed the
+# advantage, so it got bolder when ahead (called truco in 76% of points) and timid when behind
+# (13%), the opposite of tilt.
+LOOSE_CANNON_ORIGINAL = Personality(
     opponent_bias=0.0,  # its bias depends on the score: LOOSE_CANNON_BIAS_PER_ADVANTAGE
     partner_bias=0.0,
     trust=0.85,
@@ -333,6 +342,10 @@ LOOSE_CANNON = Personality(
     },
     spy_success=0.45,
 )
+
+# The emotional one (high emotionality in Laakasuo et al., 2014): its bias comes from recent
+# losses (LOOSE_CANNON_TILT_*), not from the score, which no longer replaces the cards
+LOOSE_CANNON = replace(LOOSE_CANNON_ORIGINAL, score_weight=0.0)
 
 # First version: in practice a "nit"/rock from poker (tight and passive). It called truco in 9%
 # of its chances, folded 93% of the calls and, when it accepted, won 79%: it folded far too much.

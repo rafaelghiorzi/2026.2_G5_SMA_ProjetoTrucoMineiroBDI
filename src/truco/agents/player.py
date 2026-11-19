@@ -13,7 +13,7 @@ implemented by the four classes at the end of this file. See also agents/control
 import random
 import asyncio
 from abc import abstractmethod
-from collections import Counter, defaultdict
+from collections import Counter, defaultdict, deque
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from statistics import mean
@@ -36,6 +36,8 @@ from truco.config import (
     FOLD_BONUS_WEIGHT,
     GRINDER_THREAT_TRUST,
     LOOSE_CANNON_BIAS_PER_ADVANTAGE,
+    LOOSE_CANNON_TILT_BIAS,
+    LOOSE_CANNON_TILT_WINDOW,
     MAX_GUESS,
     MIN_GUESS,
     NOT_LISTENING_FACTOR,
@@ -613,13 +615,36 @@ class MaverickBluffer(TrucoBehaviour):
 
 
 class LooseCannon(TrucoBehaviour):
+    """Impulsive and emotional: losing points puts it on tilt (LOOSE_CANNON_TILT_*)."""
+
     personality = config.LOOSE_CANNON
 
+    # False brings back the first version, driven by the score (for experiments: also set
+    # personality = config.LOOSE_CANNON_ORIGINAL)
+    tilts: bool = True
+
+    def __init__(self, *args, **kwargs) -> None:
+        super().__init__(*args, **kwargs)
+        self.recent_losses: deque[bool] = deque(maxlen=LOOSE_CANNON_TILT_WINDOW)
+
+    async def on_point_end(self, data: dict) -> None:
+        """Remembers whether the point was lost: the other team scored and mine did not."""
+        ours, theirs = self.agent.score_ours, self.agent.score_theirs
+        await super().on_point_end(data)
+        if self.agent.score_ours != ours or self.agent.score_theirs != theirs:
+            self.recent_losses.append(self.agent.score_theirs > theirs)
+
+    def tilt(self) -> float:
+        """Share of the last LOOSE_CANNON_TILT_WINDOW points that it lost (0 to 1)."""
+        return sum(self.recent_losses) / LOOSE_CANNON_TILT_WINDOW
+
     def bias(self, player: JID) -> float:
-        """About opponents: LOOSE_CANNON_BIAS_PER_ADVANTAGE × advantage."""
+        """About opponents: LOOSE_CANNON_TILT_BIAS × tilt (first version: × advantage)."""
         if player == self.agent.partner:
             return self.personality.partner_bias
-        return LOOSE_CANNON_BIAS_PER_ADVANTAGE * self.advantage()
+        if not self.tilts:
+            return LOOSE_CANNON_BIAS_PER_ADVANTAGE * self.advantage()
+        return LOOSE_CANNON_TILT_BIAS * self.tilt()
 
     def trust(self, speaker: JID, category: Category, source: Source) -> float:
         return self.personality.trust
