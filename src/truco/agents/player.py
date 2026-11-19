@@ -28,7 +28,6 @@ from truco.config import (
     ADVANTAGE_WEIGHT_IN_THRESHOLDS,
     BET_LEVELS,
     BREAK_EVEN,
-    CALL_ANNOUNCES,
     CARD_COEFFICIENT,
     CARDS_PER_HAND,
     CATEGORY_VALUE,
@@ -160,8 +159,8 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
             self.agent.hand.remove(card)
 
     async def on_call(self, data: dict) -> None:
-        """A call or raise counts as announcing a medium hand."""
-        self.agent.announcements[JID(data["player"])] = Announcement(CALL_ANNOUNCES, Source.CALL)
+        """A call or raise counts as announcing config.CALL_ANNOUNCES (a medium hand)."""
+        self.agent.announcements[JID(data["player"])] = Announcement(config.CALL_ANNOUNCES, Source.CALL)
 
     async def on_declaration(self, data: dict) -> None:
         self.agent.announcements[JID(data["player"])] = Announcement(
