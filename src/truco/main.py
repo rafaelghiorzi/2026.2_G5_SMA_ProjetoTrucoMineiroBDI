@@ -2,6 +2,7 @@
 
 import asyncio
 import random
+from itertools import product
 
 import spade
 from slixmpp import JID
@@ -17,6 +18,14 @@ from truco.agents.player import Player, LooseCannon, MaverickBluffer, Grinder, R
 
 SEATS = ["A1", "B1", "A2", "B2"]
 PERSONALITIES = [Grinder, MaverickBluffer, LooseCannon, RationalShark]
+CONTROLS = [Coward, Madman]
+GAMES_PER_SIDE = 25  # partidas por confronto e por lado (use 1 para um teste rápido)
+
+
+def lineup(team_a, team_b):
+    """Ordem dos assentos: A1, B1, A2, B2. Cada dupla tem a mesma personalidade."""
+    return [team_a, team_b, team_a, team_b]
+
 
 async def play_match(
         lineup: list[type[TrucoBehaviour] | TrucoBehaviour],
@@ -94,17 +103,37 @@ async def play_match(
     return table.score
 
 async def main() -> None:
-    recorder =  MetricsRecorder(RESULTS_FILE)
-    rng = random.Random(SEED)
-    
-    # To use control personalities, just do
-    # Order: A1, B1, A2, B2
-    # await play_match([RationalShark, Coward, RationalShark, Coward], SEED, None, recorder)
-    
+    recorder = MetricsRecorder(RESULTS_FILE)
+
+    # Todas contra todas (BDI) + cada BDI contra cada controle.
+    # product já gera (X, Y) e (Y, X): é a troca de lado.
+    matchups = [(a, b) for a, b in product(PERSONALITIES, repeat=2) if a is not b]
+    matchups += [(a, c) for a in PERSONALITIES for c in CONTROLS]
+    matchups += [(c, a) for a in PERSONALITIES for c in CONTROLS]
+
+    total = len(matchups) * GAMES_PER_SIDE
+    done = 0
+    seed = SEED
     try:
-        await play_match([rng.choice(PERSONALITIES) for _ in SEATS], SEED, (0,0), recorder)
+        for team_a, team_b in matchups:
+            for _ in range(GAMES_PER_SIDE):
+                seed += 1  # uma seed diferente por partida
+                done += 1
+                name = f"{team_a.__name__} x {team_b.__name__}"
+                try:
+                    score = await play_match(
+                        lineup(team_a, team_b), seed,
+                        think_time=None,   # sem espera artificial
+                        recorder=recorder,
+                        save_log=False,    # evita gerar milhares de arquivos .log
+                    )
+                    print(f"[{done}/{total}] seed {seed}: {name} -> {score}", flush=True)
+                except Exception as error:
+                    # Uma partida que falha não derruba o lote
+                    print(f"[{done}/{total}] seed {seed}: {name} FALHOU: {error!r}", flush=True)
     finally:
-        recorder.close()  # even if the match fails, what was measured reaches the file
+        recorder.close()  # mesmo se algo falhar, o que foi medido chega ao arquivo
+
 
 def run() -> None:
     setup_console()

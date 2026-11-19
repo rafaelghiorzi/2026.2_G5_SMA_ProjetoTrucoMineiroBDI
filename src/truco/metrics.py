@@ -23,7 +23,7 @@ class MetricsRecorder:
 
         if is_new:
             self.writer.writerow(FIELDS)
-        self.match = 0
+        self.match = 0 if is_new else self._last_match(file)
         self.seed: int | None = None
         self.seats: dict[JID, tuple[str, str]] = {}
 
@@ -48,3 +48,10 @@ class MetricsRecorder:
 
     def close(self) -> None:
         self.file.close()
+
+    @staticmethod
+    def _last_match(file: Path) -> int:
+        """Último número de partida já gravado, para continuar a contagem."""
+        with file.open(newline="", encoding="utf-8") as f:
+            numbers = [int(row["match"]) for row in csv.DictReader(f) if row["match"]]
+        return max(numbers, default=0)

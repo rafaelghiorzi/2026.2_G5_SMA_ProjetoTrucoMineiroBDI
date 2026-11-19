@@ -105,6 +105,11 @@ class StartPoint(TableState):
         table.cards_on_table = []
         table.fold_result = None
 
+        # Métrica: força e cartas de cada mão no início do ponto (só o CSV vê isso)
+        for player, hand in table.hands.items():
+            table.record("hand", player, round(hand.strength, 3), None)
+            table.record("hand_cards", player, "|".join(card.rank for card in hand), None)
+
         # 3. Each player receives ONLY their own cards.
         for player, hand in table.hands.items():
             content = {
@@ -216,6 +221,7 @@ class Turn(TableState):
         # 5. Apply it to the board and notify the 4 (including the player: it is the confirmation).
         table.hands[table.turn].remove(card)
         table.cards_on_table.append((table.turn, card))
+        table.record("card", table.turn, card.rank, table.bet.value)
         await self.notify_all({
             "event": Event.CARD_PLAYED,
             "player": table.turn,
