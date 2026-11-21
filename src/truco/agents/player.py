@@ -164,7 +164,7 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
             self.agent.hand.remove(card)
 
     async def on_call(self, data: dict) -> None:
-        """A call or raise counts as announcing config.CALL_ANNOUNCES (a medium hand)."""
+        """A call or raise counts as an announcement, heard as a hand of config.CALL_STRENGTH."""
         self.agent.announcements[JID(data["player"])] = Announcement(config.CALL_ANNOUNCES, Source.CALL)
 
     async def on_declaration(self, data: dict) -> None:
@@ -486,7 +486,10 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
             **info,
         })
     def announced_value(self, player: JID, announcement: Announcement) -> float:
-        """Strength an announcement about `player` stands for. Only the Rational Shark changes it."""
+        """Strength an announcement about `player` stands for: CALL_STRENGTH for a truco call,
+        the category's value otherwise. The Rational Shark also learns it for calls."""
+        if announcement.source == Source.CALL:
+            return config.CALL_STRENGTH
         return CATEGORY_VALUE[announcement.category]
 
     def fold_rate(self, player: JID) -> float:

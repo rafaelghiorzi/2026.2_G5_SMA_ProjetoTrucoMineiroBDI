@@ -11,11 +11,10 @@ apply(name) changes config and the behaviour classes before the matches are crea
 from truco import config
 from truco.agents.control import Madman
 from truco.agents.player import Grinder, LooseCannon, RationalShark
-from truco.config import Category
 
 CONDITIONS: dict[str, dict] = {
     "original": dict(
-        call_announces=Category.STRONG,
+        call_strength=config.CATEGORY_VALUE[config.Category.STRONG],
         madman_counts_dealt_manilha=False,
         grinder=config.GRINDER_ORIGINAL,
         shark_models_opponents=False,
@@ -23,7 +22,7 @@ CONDITIONS: dict[str, dict] = {
         loose_cannon_tilts=False,
     ),
     "anuncio": dict(
-        call_announces=Category.MEDIUM,
+        call_strength=config.CATEGORY_VALUE[config.Category.MEDIUM],
         madman_counts_dealt_manilha=False,
         grinder=config.GRINDER_ORIGINAL,
         shark_models_opponents=False,
@@ -31,7 +30,7 @@ CONDITIONS: dict[str, dict] = {
         loose_cannon_tilts=False,
     ),
     "recalibrado": dict(
-        call_announces=Category.MEDIUM,
+        call_strength=config.CATEGORY_VALUE[config.Category.MEDIUM],
         madman_counts_dealt_manilha=True,
         grinder=config.GRINDER,
         shark_models_opponents=True,
@@ -46,7 +45,7 @@ def apply(name: str) -> None:
     if name not in CONDITIONS:
         raise ValueError(f"unknown condition {name!r}: use one of {', '.join(CONDITIONS)}")
     c = CONDITIONS[name]
-    config.CALL_ANNOUNCES = c["call_announces"]
+    config.CALL_STRENGTH = c["call_strength"]
     Madman.counts_dealt_manilha = c["madman_counts_dealt_manilha"]
     Grinder.personality = c["grinder"]
     RationalShark.models_opponents = c["shark_models_opponents"]

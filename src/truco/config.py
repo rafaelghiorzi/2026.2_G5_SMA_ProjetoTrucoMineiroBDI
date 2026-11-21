@@ -215,11 +215,14 @@ MIN_GUESS = 0.027
 MAX_GUESS = 1.0
 
 NOT_LISTENING_FACTOR = 0.7  # trust in the partner for whoever did not choose "listen"
-# Calling truco counts as announcing this. MEDIUM, as the design document specifies: in the
-# simulations, whoever calls truco holds on average 0.39-0.50 of strength (a medium hand).
-# STRONG made everyone fold 77-93% of the calls, well above the 50% at which a pure bluff
-# already pays. Read at run time (config.CALL_ANNOUNCES) so an experiment can change it.
+# Calling truco counts as an announcement of category CALL_ANNOUNCES, and whoever hears it takes
+# it as a hand of strength CALL_STRENGTH. This number sets how much a call scares the table,
+# and so how much bluffing pays: 0.8 (strong) made everyone fold 77-93% of the calls and the
+# Maverick won 72% against the other BDI; 0.5 (medium, the strength callers really hold on
+# average) took its lead away. Values in between keep the bluffer ahead by less. Read at run
+# time (config.CALL_STRENGTH) so an experiment can change it.
 CALL_ANNOUNCES = Category.MEDIUM
+CALL_STRENGTH = 0.5
 
 
 # ============================================================================
