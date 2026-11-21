@@ -60,7 +60,6 @@ main { padding: .6rem; }
 /* Cards are sprites cut from the card sheet; played cards land in the middle, hands are fanned over each player's own cards */
 .card { display: inline-grid; place-items: center; width: 2.6rem; aspect-ratio: 68 / 98; }
 .card.back { background: repeating-linear-gradient(45deg, #b3342b 0 3px, #8f2620 3px 6px); border: 2px solid var(--paper); box-shadow: 0 0 0 2px var(--ink); }
-.card.joker { background: var(--paper); border: 2px solid var(--ink); color: var(--red); font-weight: 700; font-size: clamp(7px, 1cqw, 11px); }
 /* Played cards: each one is turned to face its player (the top of the card points away from them) */
 .scene > .card { width: 3.4cqw; --rot: 0deg; transform: translate(-50%, -50%) rotate(var(--rot)); animation: drop .28s steps(4) both; filter: drop-shadow(0 .15cqw 0 #0007); }
 .card.bottom { --dx: 0px; --dy: 40px; --rot: 0deg; }
@@ -80,7 +79,6 @@ main { padding: .6rem; }
 .fan.right { transform: translate(-50%, -50%) rotate(-90deg); }
 .fan .card { width: 2.8cqw; margin: 0 -.5cqw; rotate: var(--r, 0deg); filter: drop-shadow(0 .15cqw 0 #0008); }
 .fan .card.back { border-width: 1px; box-shadow: 0 0 0 1px var(--ink); }
-.fan .joker { font-size: clamp(5px, .7cqw, 8px); }
 /* Connection state and the person's seat */
 .link { font-size: .85rem; align-self: center; } .link.on { color: var(--teamA); } .link.off { color: #ff9a8f; }
 .meta small { opacity: .6; }
