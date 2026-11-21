@@ -10,6 +10,9 @@
                  player, natural prey of the bluff), the Rational Shark models its opponents,
                  the Loose Cannon tilts and the Madman is fixed. Short batches: BDI against
                  BDI only, CALIBRATION_GAMES_PER_SIDE per side.
+    calib3_lcNN  third calibration: calib2_a (strength 0.70, fold bonus 0.20, Loose Cannon with
+                 tilt -0.30) with a Loose Cannon less eager to call truco: raise_base 0.NN
+                 instead of 0.58. CALIBRATION2_GAMES_PER_SIDE per side, BDI only.
     calib2_a/b/c second calibration. In the first, the Loose Cannon led at every strength and
                  the Maverick reached only 55%. Strength near 0.70 and the Maverick's fold
                  bonus back to 0.20; b and c also restrain the Loose Cannon (LOOSE_CANNON_CONTIDO,
@@ -99,6 +102,15 @@ _CALIB2 = {
 }
 for _name, _setup in _CALIB2.items():
     CONDITIONS[_name] = dict(_setup, bdi_only=True, games_per_side=CALIBRATION2_GAMES_PER_SIDE)
+
+# Third calibration: only the Loose Cannon's threshold to call changes
+CALIBRATION3_LOOSE_CANNON_RAISE_BASES = (0.64, 0.66, 0.68)
+for _base in CALIBRATION3_LOOSE_CANNON_RAISE_BASES:
+    CONDITIONS[f"calib3_lc{round(_base * 100)}"] = dict(
+        truco_setup(0.70, fold_bonus_weight=0.20,
+                    loose_cannon=replace(config.LOOSE_CANNON, raise_base=_base)),
+        bdi_only=True, games_per_side=CALIBRATION2_GAMES_PER_SIDE,
+    )
 
 
 def apply(name: str) -> None:
