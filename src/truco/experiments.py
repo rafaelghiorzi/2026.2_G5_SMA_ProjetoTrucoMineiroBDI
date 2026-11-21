@@ -19,6 +19,9 @@ from truco import config
 from truco.agents.control import Madman
 from truco.agents.player import Grinder, LooseCannon, RationalShark
 
+# Value from config.py, for every condition that does not set its own
+DEFAULT_TILT_BIAS = config.LOOSE_CANNON_TILT_BIAS
+
 CONDITIONS: dict[str, dict] = {
     "original": dict(
         call_strength=config.CATEGORY_VALUE[config.Category.STRONG],
@@ -84,6 +87,7 @@ def apply(name: str) -> None:
     RationalShark.models_opponents = c["shark_models_opponents"]
     LooseCannon.personality = c["loose_cannon"]
     LooseCannon.tilts = c["loose_cannon_tilts"]
+    config.LOOSE_CANNON_TILT_BIAS = c.get("loose_cannon_tilt_bias", DEFAULT_TILT_BIAS)
 
 
 def results_file(name: str) -> str:

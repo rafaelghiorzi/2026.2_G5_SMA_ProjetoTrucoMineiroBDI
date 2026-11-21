@@ -35,7 +35,6 @@ from truco.config import (
     FOLD_BONUS_INITIAL_FOLDS,
     GRINDER_THREAT_TRUST,
     LOOSE_CANNON_BIAS_PER_ADVANTAGE,
-    LOOSE_CANNON_TILT_BIAS,
     LOOSE_CANNON_TILT_WINDOW,
     MAX_GUESS,
     MIN_GUESS,
@@ -646,7 +645,7 @@ class LooseCannon(TrucoBehaviour):
             return self.personality.partner_bias
         if not self.tilts:
             return LOOSE_CANNON_BIAS_PER_ADVANTAGE * self.advantage()
-        return LOOSE_CANNON_TILT_BIAS * self.tilt()
+        return config.LOOSE_CANNON_TILT_BIAS * self.tilt()  # read at run time: experiments change it
 
     def trust(self, speaker: JID, category: Category, source: Source) -> float:
         return self.personality.trust
