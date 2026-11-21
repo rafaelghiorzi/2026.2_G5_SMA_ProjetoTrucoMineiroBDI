@@ -222,7 +222,7 @@ NOT_LISTENING_FACTOR = 0.7  # trust in the partner for whoever did not choose "l
 # average) took its lead away. Values in between keep the bluffer ahead by less. Read at run
 # time (config.CALL_STRENGTH) so an experiment can change it.
 CALL_ANNOUNCES = Category.MEDIUM
-CALL_STRENGTH = 0.5
+CALL_STRENGTH = 0.70  # definitive configuration, chosen by calibration
 
 
 # ============================================================================
@@ -348,7 +348,10 @@ LOOSE_CANNON_ORIGINAL = Personality(
 
 # The emotional one (high emotionality in Laakasuo et al., 2014): its bias comes from recent
 # losses (LOOSE_CANNON_TILT_*), not from the score, which no longer replaces the cards
-LOOSE_CANNON = replace(LOOSE_CANNON_ORIGINAL, score_weight=0.0)
+LOOSE_CANNON_TILT = replace(LOOSE_CANNON_ORIGINAL, score_weight=0.0)
+
+# Definitive configuration: the hothead with tilt, a bit less eager to call (0.58 -> 0.64)
+LOOSE_CANNON = replace(LOOSE_CANNON_TILT, raise_base=0.64)
 
 # First version: in practice a "nit"/rock from poker (tight and passive). It called truco in 9%
 # of its chances, folded 93% of the calls and, when it accepted, won 79%: it folded far too much.
@@ -374,10 +377,14 @@ GRINDER_ORIGINAL = Personality(
 # The poker grinder: disciplined and low-variance, playing small edges over many hands, tight
 # but not afraid. Still calls only with strong hands (high raise_base) and still keeps its good
 # cards, but no longer overestimates the opponents nor folds hands that are worth accepting.
-GRINDER = replace(
+GRINDER_POKER = replace(
     GRINDER_ORIGINAL,
     opponent_bias=0.05,
     partner_bias=-0.05,
     caution=0.03,
     raise_base=0.72,
 )
+
+# Definitive configuration: in truco the Grinder is the cautious player, natural prey of the
+# bluff, so it keeps its first version
+GRINDER = GRINDER_ORIGINAL

@@ -10,6 +10,8 @@
                  player, natural prey of the bluff), the Rational Shark models its opponents,
                  the Loose Cannon tilts and the Madman is fixed. Short batches: BDI against
                  BDI only, CALIBRATION_GAMES_PER_SIDE per side.
+    definitiva   definitive round: the calib4_a configuration, which is now the default in
+                 config.py, with the control players and the full batch.
     calib4_a     fourth calibration: calib3_lc64 with the Maverick's fold bonus only for calling
                  truco, not for raising when answering. CALIBRATION2_GAMES_PER_SIDE per side.
     calib3_lcNN  third calibration: calib2_a (strength 0.70, fold bonus 0.20, Loose Cannon with
@@ -56,9 +58,9 @@ CONDITIONS: dict[str, dict] = {
         call_strength=config.CATEGORY_VALUE[config.Category.MEDIUM],
         fold_bonus_weight=0.2,
         madman_counts_dealt_manilha=True,
-        grinder=config.GRINDER,
+        grinder=config.GRINDER_POKER,
         shark_models_opponents=True,
-        loose_cannon=config.LOOSE_CANNON,
+        loose_cannon=config.LOOSE_CANNON_TILT,
         loose_cannon_tilts=True,
     ),
 }
@@ -70,7 +72,7 @@ CALIBRATION_GAMES_PER_SIDE = 10
 def truco_setup(
     call_strength: float,
     fold_bonus_weight: float = 0.15,
-    loose_cannon: config.Personality = config.LOOSE_CANNON,
+    loose_cannon: config.Personality = config.LOOSE_CANNON_TILT,
     loose_cannon_tilt_bias: float = DEFAULT_TILT_BIAS,
 ) -> dict:
     """The personalities tuned for truco, with a given strength for a truco call."""
@@ -93,7 +95,7 @@ for _strength in CALIBRATION_STRENGTHS:
 
 # Second calibration: a restrained Loose Cannon asks for a bit more before calling (0.58 -> 0.62)
 # and tilts less (-0.30 -> -0.20). Still the hothead of the table, no longer a second bluffer.
-LOOSE_CANNON_CONTIDO = replace(config.LOOSE_CANNON, raise_base=0.62)
+LOOSE_CANNON_CONTIDO = replace(config.LOOSE_CANNON_TILT, raise_base=0.62)
 CALIBRATION2_GAMES_PER_SIDE = 20
 _CALIB2 = {
     "calib2_a": truco_setup(0.70, fold_bonus_weight=0.20),
@@ -108,9 +110,17 @@ for _name, _setup in _CALIB2.items():
 # Fourth calibration: the Maverick no longer bluffs back when it receives a call
 CONDITIONS["calib4_a"] = dict(
     truco_setup(0.70, fold_bonus_weight=0.20,
-                loose_cannon=replace(config.LOOSE_CANNON, raise_base=0.64)),
+                loose_cannon=replace(config.LOOSE_CANNON_TILT, raise_base=0.64)),
     maverick_bonus_when_raising=False,
     bdi_only=True, games_per_side=CALIBRATION2_GAMES_PER_SIDE,
+)
+
+# Definitive round: the calib4_a configuration (the defaults in config.py), with the control
+# players and the full batch (GAMES_PER_SIDE per side in main.py)
+CONDITIONS["definitiva"] = dict(
+    truco_setup(config.CALL_STRENGTH, fold_bonus_weight=config.FOLD_BONUS_WEIGHT,
+                loose_cannon=config.LOOSE_CANNON),
+    maverick_bonus_when_raising=False,
 )
 
 # Third calibration: only the Loose Cannon's threshold to call changes
@@ -118,7 +128,7 @@ CALIBRATION3_LOOSE_CANNON_RAISE_BASES = (0.64, 0.66, 0.68)
 for _base in CALIBRATION3_LOOSE_CANNON_RAISE_BASES:
     CONDITIONS[f"calib3_lc{round(_base * 100)}"] = dict(
         truco_setup(0.70, fold_bonus_weight=0.20,
-                    loose_cannon=replace(config.LOOSE_CANNON, raise_base=_base)),
+                    loose_cannon=replace(config.LOOSE_CANNON_TILT, raise_base=_base)),
         bdi_only=True, games_per_side=CALIBRATION2_GAMES_PER_SIDE,
     )
 
@@ -136,7 +146,7 @@ def apply(name: str) -> None:
     LooseCannon.personality = c["loose_cannon"]
     LooseCannon.tilts = c["loose_cannon_tilts"]
     config.LOOSE_CANNON_TILT_BIAS = c.get("loose_cannon_tilt_bias", DEFAULT_TILT_BIAS)
-    MaverickBluffer.bonus_when_raising = c.get("maverick_bonus_when_raising", True)
+    MaverickBluffer.bonus_when_raising = c.get("maverick_bonus_when_raising", True)  # True: as before
 
 
 def results_file(name: str) -> str:

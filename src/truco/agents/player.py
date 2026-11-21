@@ -600,8 +600,9 @@ class MaverickBluffer(TrucoBehaviour):
     # folds every time and would give a bonus that is not skill.
     opponents_are_control: bool = False
     # False: the fold bonus helps only to call truco, not to raise when answering a call.
-    # The bluffer bluffs when it has the initiative, but does not bluff back (experiments).
-    bonus_when_raising: bool = True
+    # The bluffer bluffs when it has the initiative, but does not bluff back. True brings back
+    # the earlier version (for experiments).
+    bonus_when_raising: bool = False
 
     def raise_bonus(self) -> float:
         return self.call_bonus() if self.bonus_when_raising else 0.0

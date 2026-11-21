@@ -27,7 +27,7 @@ CONTROLS = [Coward, Madman]
 GAMES_PER_SIDE = 25  # partidas por confronto e por lado (use 1 para um teste rápido)
 # Condições rodadas quando nenhuma é passada na linha de comando (ver truco/experiments.py).
 # A "original" já foi rodada em 18/11 (results/events.csv), com as mesmas seeds.
-DEFAULT_CONDITIONS = ["anuncio", "recalibrado"]
+DEFAULT_CONDITIONS = ["definitiva"]
 
 
 def lineup(team_a, team_b):
