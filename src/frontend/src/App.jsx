@@ -34,10 +34,11 @@ const MANILHAS = new Set(["7D", "AS", "7H", "4C"]);
 const pct = (x) => `${Math.round(x * 100)}%`;
 
 function Card({ card, back, area, style }) {
-  const cls = ["card", area, back && "back", card?.rank === "JK" && "joker"].filter(Boolean).join(" ");
+  const cls = ["card", area, back && "back"].filter(Boolean).join(" ");
   if (back) return <span className={cls} style={style} />;
-  if (card.rank === "JK") return <span className={cls} style={style}>JOKER</span>;
-  const file = MANILHAS.has(card.rank) ? `m_${card.rank}` : `${card.rank}_${card.suit}`;
+  const file = card.rank === "JK"
+    ? "JK"
+    : MANILHAS.has(card.rank) ? `m_${card.rank}` : `${card.rank}_${card.suit}`;
   return <img className={cls} style={style} src={`/cards/${file}.png`} alt={card.rank} title={card.rank === "4C" ? "Zap" : card.rank} />;
 }
 
@@ -225,7 +226,7 @@ export default function App() {
 
   const st = useMemo(() => events.slice(0, cursor).reduce(step, initial), [events, cursor]);
   const me = st.seats.find((x) => x.human);
-  const reveal = !me || showHands;
+  const reveal = showHands;
   const offset = me ? st.seats.indexOf(me) : 0; // whoever plays sits at the bottom
 
   // Playing, the agents' hands and minds start hidden; watching, everything starts open
