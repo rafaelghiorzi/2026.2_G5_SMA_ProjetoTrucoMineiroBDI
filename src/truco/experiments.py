@@ -15,6 +15,7 @@ from truco.agents.player import Grinder, LooseCannon, RationalShark
 CONDITIONS: dict[str, dict] = {
     "original": dict(
         call_strength=config.CATEGORY_VALUE[config.Category.STRONG],
+        fold_bonus_weight=0.2,
         madman_counts_dealt_manilha=False,
         grinder=config.GRINDER_ORIGINAL,
         shark_models_opponents=False,
@@ -23,6 +24,7 @@ CONDITIONS: dict[str, dict] = {
     ),
     "anuncio": dict(
         call_strength=config.CATEGORY_VALUE[config.Category.MEDIUM],
+        fold_bonus_weight=0.2,
         madman_counts_dealt_manilha=False,
         grinder=config.GRINDER_ORIGINAL,
         shark_models_opponents=False,
@@ -31,6 +33,7 @@ CONDITIONS: dict[str, dict] = {
     ),
     "recalibrado": dict(
         call_strength=config.CATEGORY_VALUE[config.Category.MEDIUM],
+        fold_bonus_weight=0.2,
         madman_counts_dealt_manilha=True,
         grinder=config.GRINDER,
         shark_models_opponents=True,
@@ -46,6 +49,7 @@ def apply(name: str) -> None:
         raise ValueError(f"unknown condition {name!r}: use one of {', '.join(CONDITIONS)}")
     c = CONDITIONS[name]
     config.CALL_STRENGTH = c["call_strength"]
+    config.FOLD_BONUS_WEIGHT = c["fold_bonus_weight"]
     Madman.counts_dealt_manilha = c["madman_counts_dealt_manilha"]
     Grinder.personality = c["grinder"]
     RationalShark.models_opponents = c["shark_models_opponents"]

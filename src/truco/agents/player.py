@@ -33,7 +33,6 @@ from truco.config import (
     CATEGORY_VALUE,
     FOLD_BONUS_INITIAL_CALLS,
     FOLD_BONUS_INITIAL_FOLDS,
-    FOLD_BONUS_WEIGHT,
     GRINDER_THREAT_TRUST,
     LOOSE_CANNON_BIAS_PER_ADVANTAGE,
     LOOSE_CANNON_TILT_BIAS,
@@ -611,7 +610,7 @@ class MaverickBluffer(TrucoBehaviour):
         folds = 0 if self.opponents_are_control else self.agent.folds[target]
         calls = 0 if self.opponents_are_control else self.agent.calls_received[target]
         fold_rate = (folds + FOLD_BONUS_INITIAL_FOLDS) / (calls + FOLD_BONUS_INITIAL_CALLS)
-        return FOLD_BONUS_WEIGHT * fold_rate
+        return config.FOLD_BONUS_WEIGHT * fold_rate  # read at run time: experiments change it
 
     def open_round(self) -> Card:
         return self.draw_opening()
