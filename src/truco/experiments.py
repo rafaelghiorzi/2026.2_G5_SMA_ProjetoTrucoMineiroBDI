@@ -4,8 +4,15 @@
                  hand, first versions of Grinder, Rational Shark, Loose Cannon and Madman
     anuncio      only the fix of the announcement: a call counts as a medium hand
     recalibrado  every change: announcement, Madman, Grinder, Rational Shark and Loose Cannon
+    calib_NNN    calibration for truco: the bluffer stays ahead, by less. A call is heard as a
+                 hand of strength NNN/100 (between medium 0.5 and strong 0.8), the Maverick's fold
+                 bonus drops to 0.15, the Grinder is back to its first version (the cautious
+                 player, natural prey of the bluff), the Rational Shark models its opponents,
+                 the Loose Cannon tilts and the Madman is fixed. Short batches: BDI against
+                 BDI only, CALIBRATION_GAMES_PER_SIDE per side.
 
 apply(name) changes config and the behaviour classes before the matches are created.
+A condition may also set the batch: "bdi_only" (no control players) and "games_per_side".
 """
 
 from truco import config
@@ -41,6 +48,28 @@ CONDITIONS: dict[str, dict] = {
         loose_cannon_tilts=True,
     ),
 }
+
+CALIBRATION_STRENGTHS = (0.60, 0.65, 0.70, 0.75)
+CALIBRATION_GAMES_PER_SIDE = 10
+
+
+def truco_setup(call_strength: float) -> dict:
+    """The personalities tuned for truco, with a given strength for a truco call."""
+    return dict(
+        call_strength=call_strength,
+        fold_bonus_weight=0.15,
+        madman_counts_dealt_manilha=True,
+        grinder=config.GRINDER_ORIGINAL,
+        shark_models_opponents=True,
+        loose_cannon=config.LOOSE_CANNON,
+        loose_cannon_tilts=True,
+    )
+
+
+for _strength in CALIBRATION_STRENGTHS:
+    CONDITIONS[f"calib_{round(_strength * 100):03d}"] = dict(
+        truco_setup(_strength), bdi_only=True, games_per_side=CALIBRATION_GAMES_PER_SIDE
+    )
 
 
 def apply(name: str) -> None:

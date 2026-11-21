@@ -121,11 +121,16 @@ async def main() -> None:
     for name in conditions:
         experiments.apply(name)
         print(f"=== condição {name} -> {experiments.results_file(name)}", flush=True)
-        await run_batch(experiments.results_file(name))
+        settings = experiments.CONDITIONS[name]
+        await run_batch(
+            experiments.results_file(name),
+            games_per_side=settings.get("games_per_side", GAMES_PER_SIDE),
+            with_controls=not settings.get("bdi_only", False),
+        )
 
 
-async def run_batch(results_file: str) -> None:
-    """Todas contra todas e cada BDI contra cada controle, GAMES_PER_SIDE partidas por lado."""
+async def run_batch(results_file: str, games_per_side: int = GAMES_PER_SIDE, with_controls: bool = True) -> None:
+    """Todas contra todas e, com with_controls, cada BDI contra cada controle; games_per_side por lado."""
     done_seeds = finished_seeds(results_file)
     if done_seeds:
         print(f"retomando: {len(done_seeds)} partidas já estão em {results_file}", flush=True)
@@ -134,15 +139,16 @@ async def run_batch(results_file: str) -> None:
     # Todas contra todas (BDI) + cada BDI contra cada controle.
     # product já gera (X, Y) e (Y, X): é a troca de lado.
     matchups = [(a, b) for a, b in product(PERSONALITIES, repeat=2) if a is not b]
-    matchups += [(a, c) for a in PERSONALITIES for c in CONTROLS]
-    matchups += [(c, a) for a in PERSONALITIES for c in CONTROLS]
+    if with_controls:
+        matchups += [(a, c) for a in PERSONALITIES for c in CONTROLS]
+        matchups += [(c, a) for a in PERSONALITIES for c in CONTROLS]
 
-    total = len(matchups) * GAMES_PER_SIDE
+    total = len(matchups) * games_per_side
     done = 0
     seed = SEED
     try:
         for team_a, team_b in matchups:
-            for _ in range(GAMES_PER_SIDE):
+            for _ in range(games_per_side):
                 seed += 1  # uma seed diferente por partida
                 done += 1
                 if seed in done_seeds:  # já jogada numa execução interrompida
