@@ -386,9 +386,14 @@ class TrucoBehaviour(LoggedSend, CyclicBehaviour):
         if chance < self.fold_threshold(value_called):   
             return Response.FOLD
         can_raise = value_called < BET_LEVELS[-1]        
-        if can_raise and chance + self.call_bonus() > self.raise_threshold():
+        if can_raise and chance + self.raise_bonus() > self.raise_threshold():
             return Response.RAISE
         return Response.ACCEPT
+
+    def raise_bonus(self) -> float:
+        """Bonus for raising when answering a call. The same as for calling, unless the
+        personality says otherwise (the Maverick, in some experiments)."""
+        return self.call_bonus()
 
     def current_round_cards(self) -> dict[JID, Card]:
         """Cards of the current round: whoever played more cards than the rounds already finished.
@@ -594,6 +599,12 @@ class MaverickBluffer(TrucoBehaviour):
     # Against control players the rate is fixed at the neutral value: a Coward
     # folds every time and would give a bonus that is not skill.
     opponents_are_control: bool = False
+    # False: the fold bonus helps only to call truco, not to raise when answering a call.
+    # The bluffer bluffs when it has the initiative, but does not bluff back (experiments).
+    bonus_when_raising: bool = True
+
+    def raise_bonus(self) -> float:
+        return self.call_bonus() if self.bonus_when_raising else 0.0
 
     def bias(self, player: JID) -> float:
         if player == self.agent.partner:

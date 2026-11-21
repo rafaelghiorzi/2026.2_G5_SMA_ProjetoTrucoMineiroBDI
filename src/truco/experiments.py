@@ -26,7 +26,7 @@ from dataclasses import replace
 
 from truco import config
 from truco.agents.control import Madman
-from truco.agents.player import Grinder, LooseCannon, RationalShark
+from truco.agents.player import Grinder, LooseCannon, MaverickBluffer, RationalShark
 
 # Value from config.py, for every condition that does not set its own
 DEFAULT_TILT_BIAS = config.LOOSE_CANNON_TILT_BIAS
@@ -126,6 +126,7 @@ def apply(name: str) -> None:
     LooseCannon.personality = c["loose_cannon"]
     LooseCannon.tilts = c["loose_cannon_tilts"]
     config.LOOSE_CANNON_TILT_BIAS = c.get("loose_cannon_tilt_bias", DEFAULT_TILT_BIAS)
+    MaverickBluffer.bonus_when_raising = c.get("maverick_bonus_when_raising", True)
 
 
 def results_file(name: str) -> str:
