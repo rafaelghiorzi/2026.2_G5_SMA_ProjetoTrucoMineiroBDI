@@ -180,8 +180,16 @@ async def main() -> None:
 
 
 def _port_in_use(port: int) -> bool:
+    # Tries to reserve the port instead of connecting to it: under WSL's mirrored networking a
+    # connect to a free port hangs until the TCP timeout, while bind answers immediately
     with socket.socket() as s:
-        return s.connect_ex(("127.0.0.1", port)) == 0
+        # SO_REUSEADDR: ignore sockets left in TIME_WAIT by a server that just stopped
+        s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        try:
+            s.bind(("127.0.0.1", port))
+        except OSError:  # EADDRINUSE: someone is already listening here
+            return True
+        return False
 
 
 def run() -> None:
