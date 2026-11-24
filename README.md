@@ -165,6 +165,10 @@ src/
 <!-- TODO: substituir pelo link do vídeo -->
 [Apresentação do projeto (≈15 min)](https://youtu.be/LINK_DO_VIDEO)
 
+## Artigo
+
+O projeto foi descrito e sua análise foi reportada em um artigo que pode ser acessado na [documentação](docs/artigo_truco_isma.pdf)
+
 ## Participações
 
 |Nome do Membro | Contribuição | Significância da Contribuição para o Projeto (Excelente/Boa/Regular/Ruim/Nula) | Comprobatórios (ex. links para commits)
