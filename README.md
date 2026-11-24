@@ -163,7 +163,8 @@ src/
 ## Vídeo
 
 <!-- TODO: substituir pelo link do vídeo -->
-[Apresentação do projeto (≈15 min)](https://youtu.be/LINK_DO_VIDEO)
+O vídeo de apresentação do projeto pode ser acessado pelo
+[link de apresentação](https://youtu.be/mYIJ5SbbjMo?is=MCpIn7h3QI-WKG0B)
 
 ## Artigo
 
