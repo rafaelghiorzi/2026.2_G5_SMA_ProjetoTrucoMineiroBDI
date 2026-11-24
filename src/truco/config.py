@@ -17,7 +17,7 @@ MATCH_LOG_DIR = "match_logs"  # one log file per match
 RESULTS_FILE = "results/events.csv"  # metrics of the measured matches
 MAX_RETRIES = 3  # failures in a row before the table decides for a player
 THINK_TIME: tuple[float, float] | None = (1.0, 3.0)  # seconds a player "thinks"; None = no delay
-SEED = 67  # the same seed repeats the deals and the players' draws
+SEED = 2005  # the same seed repeats the deals and the players' draws
 
 # SPADE's embedded XMPP server
 XMPP_DOMAIN = "localhost"
